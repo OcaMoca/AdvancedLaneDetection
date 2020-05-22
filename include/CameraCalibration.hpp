@@ -18,8 +18,6 @@ class CameraCalibration
         Mat dist_coefs;
         Mat map1, map2;
 
-        int flag;
-
     public: 
         CameraCalibration() {};
 

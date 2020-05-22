@@ -33,7 +33,7 @@ Window Window::get_next_window(Mat& binary_warped)
     int cnt_nonzeros;
     cnt_nonzeros = count_nonzero();
 
-    if(this->y_top == 0) return Window();
+    if(this->y_top <= 0) return Window();
 
     int new_y_top = y_top - height;
     int new_x_center = x_center;
@@ -43,7 +43,7 @@ Window Window::get_next_window(Mat& binary_warped)
         new_x_center = (int)(accumulate( non_zero_x.begin(), non_zero_x.end(), 0.0) / cnt_nonzeros) + x_left;
     }
 
-    if(new_x_center + this->width > binary_warped.cols) return Window();
+    if(new_x_center + this->width >= binary_warped.cols || new_x_center - this->width <= 0) return Window();
 
     Window result(binary_warped, new_x_center, new_y_top, this->width, this->height, this->min_pix);
     return result;

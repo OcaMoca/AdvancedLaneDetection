@@ -5,7 +5,7 @@ int main() {
     bool processed;
 
     string file_name = "test_videos/project_video.mp4";
-    string output_file = "test_videos_output/test2.mp4";
+    string output_file = "test_videos_output/project_video_out.mp4";
 
     LaneDetection ld;
 
@@ -20,6 +20,7 @@ int main() {
             break;
 
         cnt++;  
+
         cout << cnt << endl;
 
     }

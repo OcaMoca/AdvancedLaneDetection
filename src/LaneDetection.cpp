@@ -6,6 +6,7 @@ LaneDetection::LaneDetection()
   trap_top_width = 0.1f; 
   trap_height = 0.38f;
   car_hood = 50;
+  first_frame = true;
 
 }
 
@@ -17,17 +18,17 @@ void LaneDetection::color_filter(Mat& filtered_image)
     Mat white_image;
     Mat yellow_image;
 
-    cv::inRange(frame, Scalar(190,190,190), Scalar(255,255,255), mask1);
+    cv::inRange(frame, Scalar(180,180,180), Scalar(255,255,255), mask1);
 
     //cvtColor(frame, image_hsv, COLOR_BGR2HSV);
     //cv::inRange(image_hsv, Scalar(20,90,100), Scalar(50,255,255), mask2);
 
     cvtColor(frame, image_hsv, COLOR_RGB2HSV);
-    cv::inRange(image_hsv, Scalar(90, 60,100), Scalar(110,255,255), mask2);
+    cv::inRange(image_hsv, Scalar(90,70,100), Scalar(110,255,255), mask2);
 
     cv::bitwise_and(frame, frame, white_image, mask1);
     
-    cv::bitwise_and(frame, frame, yellow_image, mask2);
+    cv::bitwise_and(frame, frame, yellow_image, mask2); 
     
     addWeighted(white_image, 1., yellow_image, 1., 0., filtered_image);
     
@@ -103,13 +104,13 @@ void LaneDetection::sliding_window(Mat& binary_warped, Point& left_peak, Point& 
   Mat gray_tmp;
 
   N_windows = 9;
-  window_width = 50;
+  window_width = 100;
   window_height = binary_warped.rows / N_windows;
 
   gray_tmp = binary_warped.clone();
 
-  Window window_left(binary_warped, left_peak.x, binary_warped.rows - window_height, window_width, window_height, 20);
-  Window window_right(binary_warped, right_peak.x, binary_warped.rows - window_height, window_width, window_height, 20);
+  Window window_left(binary_warped, left_peak.x, binary_warped.rows - window_height, window_width, window_height, 50);
+  Window window_right(binary_warped, right_peak.x, binary_warped.rows - window_height, window_width, window_height, 50);
 
   cvtColor(binary_warped, output_image, COLOR_GRAY2RGB);
 
@@ -126,6 +127,12 @@ void LaneDetection::sliding_window(Mat& binary_warped, Point& left_peak, Point& 
 
   }
 
+}
+
+void LaneDetection::non_sliding_window(Mat& binary_warped, Point& left_peak, Point& right_peak, Mat& output_image, vector<Window>& left_boxes, vector<Window>& right_boxes)
+{
+
+return;
 }
 
 Mat LaneDetection::polyfit_windows(vector<Window> const& windows)
@@ -281,17 +288,16 @@ void LaneDetection::init(string file_name, string output_file)
 
 
   vector<string> chessboard_images;
-  cv::glob("../camera_cal/calibration*.jpg", chessboard_images);
+  cv::glob("/home/Olivera/LaneDetectionBCs/camera_cal/*.jpg", chessboard_images);
 
   bool success;
   int error;
   cv::Size board_size(8,6);
   Mat img = imread(chessboard_images[0]);
-  cv::Size image_size(img.size());
+  cv::Size image_size(1280,720);
 
   success = calibrator.add_chessboard_points(chessboard_images, board_size);
   error = calibrator.calibration(image_size);
-
 
   if(capture.read(frame))
     trapezoid_roi();
@@ -316,8 +322,7 @@ bool LaneDetection::frame_processing()
 
   undistorted_frame = calibrator.undistort_image(frame);
 
-  imshow("test", undistorted_frame);
-  waitKey(0);
+  frame = undistorted_frame;
 
   color_filter(filtered_image);
 
@@ -327,7 +332,15 @@ bool LaneDetection::frame_processing()
 
   calculate_lane_histogram(histogram, left_peak, right_peak);
 
-  sliding_window(binary_warped, left_peak, right_peak, sliding_window_output, left_boxes, right_boxes);
+  if(first_frame ==  true)
+  {
+    sliding_window(binary_warped, left_peak, right_peak, sliding_window_output, left_boxes, right_boxes);
+
+  } else 
+  {
+    non_sliding_window(binary_warped, left_peak, right_peak, sliding_window_output, left_boxes, right_boxes);
+  }
+  
 
   left_fit = polyfit_windows(left_boxes);
   right_fit = polyfit_windows(right_boxes);

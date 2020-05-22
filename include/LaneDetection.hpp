@@ -29,20 +29,20 @@ class LaneDetection
 
         vector<Point2f> original_roi;
         vector<Point2f> warped_roi;
+        bool first_frame;
 
         void polyfit(const Mat&, const Mat&, Mat&, int);
         vector<float> linspace(float, float, int);
         Mat polyfit_windows(vector<Window> const&);
         void poly_fit_x(vector<float> const&, vector<float>&, Mat const&);
 
-        
-        //void setup_calibration(int, int, float, Mat&);
         void trapezoid_roi();
         void color_filter(Mat&);
         void perspective_transform(const Mat&, Mat&);
         void get_histogram(Mat const&, Mat&);
         void calculate_lane_histogram(const Mat&, Point&, Point&);
         void sliding_window(Mat&, Point&, Point&, Mat&, vector<Window>&, vector<Window>&);
+        void non_sliding_window(Mat&, Point&, Point&, Mat&, vector<Window>&, vector<Window>&);
         void get_inverse_points(vector<float>&, vector<float>&, vector<float>&, Mat&);
         void inverse_perspective(const Mat&, Mat&, Mat&);
         void final_perspective(const Mat&, const Mat&, Mat&, Mat&);
