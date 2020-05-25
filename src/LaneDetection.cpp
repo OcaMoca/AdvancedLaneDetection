@@ -18,10 +18,7 @@ void LaneDetection::color_filter(Mat& filtered_image)
     Mat white_image;
     Mat yellow_image;
 
-    cv::inRange(frame, Scalar(180,180,180), Scalar(255,255,255), mask1);
-
-    //cvtColor(frame, image_hsv, COLOR_BGR2HSV);
-    //cv::inRange(image_hsv, Scalar(20,90,100), Scalar(50,255,255), mask2);
+    cv::inRange(frame, Scalar(190,190,190), Scalar(255,255,255), mask1);
 
     cvtColor(frame, image_hsv, COLOR_RGB2HSV);
     cv::inRange(image_hsv, Scalar(90,70,100), Scalar(110,255,255), mask2);
@@ -33,6 +30,32 @@ void LaneDetection::color_filter(Mat& filtered_image)
     addWeighted(white_image, 1., yellow_image, 1., 0., filtered_image);
     
 }
+
+ void LaneDetection::calculate_sobel(Mat& sobel_output)
+ {
+   int dx, dy;
+   int depth = CV_16S;
+   Mat gray;
+   Mat grad_x, grad_y, abs_grad_x, abs_grad_y;
+   int scale = 1;
+   int delta = 0;
+
+   GaussianBlur(frame, frame, Size(3,3), 0, 0, BORDER_DEFAULT);
+
+   cvtColor(frame, gray, COLOR_BGR2GRAY);
+
+   Sobel(gray, grad_x, depth, 1, 0, 3, scale, delta, BORDER_DEFAULT);
+   convertScaleAbs(grad_x, abs_grad_x);
+
+   Sobel(gray, grad_y, depth, 0, 1, 3, scale, delta, BORDER_DEFAULT);
+   convertScaleAbs(grad_y, abs_grad_y);
+
+   addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0 , sobel_output);
+
+   return;
+
+ }
+
 
 void LaneDetection::trapezoid_roi()
 {
@@ -53,21 +76,18 @@ void LaneDetection::trapezoid_roi()
 
 }
 
-void LaneDetection::perspective_transform(const Mat& color_filtered_image, Mat& binary_warped)
+void LaneDetection::perspective_transform(const Mat& filtered_image_gray, Mat& binary_warped)
 {
-
-  Mat gray;
   Mat binary_threshold;
   Mat M(2,4,CV_32FC2);
-
-  cvtColor(color_filtered_image, gray, COLOR_RGB2GRAY);
+  
 
   M = getPerspectiveTransform(original_roi, warped_roi);
   
-  binary_threshold =  Mat::zeros(gray.rows, gray.cols, CV_8UC3);
-  threshold(gray, binary_threshold, 0, 255, THRESH_BINARY);
+  binary_threshold =  Mat::zeros(filtered_image_gray.rows, filtered_image_gray.cols, CV_8UC3);
+  threshold(filtered_image_gray, binary_threshold, 0, 255, THRESH_BINARY);
 
-  warpPerspective(binary_threshold, binary_warped, M, color_filtered_image.size(), INTER_LINEAR);
+  warpPerspective(binary_threshold, binary_warped, M, filtered_image_gray.size(), INTER_LINEAR);
   
 
 }
@@ -129,12 +149,6 @@ void LaneDetection::sliding_window(Mat& binary_warped, Point& left_peak, Point& 
 
 }
 
-void LaneDetection::non_sliding_window(Mat& binary_warped, Point& left_peak, Point& right_peak, Mat& output_image, vector<Window>& left_boxes, vector<Window>& right_boxes)
-{
-
-return;
-}
-
 Mat LaneDetection::polyfit_windows(vector<Window> const& windows)
 {
 	int n = (int)windows.size();
@@ -163,6 +177,65 @@ Mat LaneDetection::polyfit_windows(vector<Window> const& windows)
 	polyfit(ys, xs, fit, 2);
 
 	return fit;
+
+}
+
+void LaneDetection::calculate_lane_fit_next_frame(vector<Point2f> non_zero, Mat& lane_fit, vector<float>& xs, vector<float>& ys, int margin) 
+{
+  float x, y, left_x, right_x;
+
+  for(auto const& pt: non_zero)
+  {
+    x = pt.x;
+    y = pt.y;
+
+    left_x = lane_fit.at<float>(2, 0) * y * y + lane_fit.at<float>(1, 0) * y + lane_fit.at<float>(0, 0) - margin;
+    right_x = lane_fit.at<float>(2, 0) * y * y + lane_fit.at<float>(1, 0) * y + lane_fit.at<float>(0, 0) + margin;
+
+    if(x > left_x && x < right_x)
+    {
+      xs.push_back(x);
+      ys.push_back(y);
+    }
+
+  }
+
+  return;
+
+}
+
+void LaneDetection::non_sliding_window(Mat& binary_warped, Mat& left_fit, Mat& right_fit, Mat& new_left_fit,  Mat& new_right_fit, int margin)
+{
+  vector<Point2f> non_zero;
+  cv::findNonZero(binary_warped, non_zero);
+
+  vector<float> left_xs, left_ys, right_xs, right_ys;
+
+  calculate_lane_fit_next_frame(non_zero, left_fit, left_xs, left_ys, margin);
+  calculate_lane_fit_next_frame(non_zero, right_fit, right_xs, right_ys, margin);
+
+  new_left_fit = left_fit;
+  new_right_fit = right_fit;
+
+  if(!left_fit.empty())
+  {
+    new_left_fit = cv::Mat::zeros(3,1, CV_32FC1);
+    Mat xs(left_xs, CV_32FC1);
+    Mat ys(left_ys, CV_32FC1);
+    polyfit(ys, xs, new_left_fit, 2);
+
+  }  
+
+  if(!right_fit.empty())
+  {
+    new_right_fit = cv::Mat::zeros(3,1, CV_32FC1);
+    Mat xs(right_xs, CV_32FC1);
+    Mat ys(right_ys, CV_32FC1);
+    polyfit(ys, xs, new_right_fit, 2);
+    
+  } 
+
+  return;
 
 }
 
@@ -231,12 +304,12 @@ void LaneDetection::poly_fit_x(vector<float> const& ploty, vector<float>& fit_x,
 	return;
 }
 
-void LaneDetection::inverse_perspective(const Mat& sliding_window_output, Mat& Minv, Mat& output_image)
+void LaneDetection::inverse_perspective(const Mat& warped_output, Mat& Minv, Mat& output_image)
 {
-  Mat color_warp = Mat::zeros(sliding_window_output.size(), CV_8UC3);
+  Mat color_warp = Mat::zeros(warped_output.size(), CV_8UC3);
 
   Minv = getPerspectiveTransform(warped_roi, original_roi);
-  warpPerspective(sliding_window_output, output_image, Minv, sliding_window_output.size(),INTER_LINEAR);
+  warpPerspective(warped_output, output_image, Minv, warped_output.size(),INTER_LINEAR);
 
 }
 
@@ -267,6 +340,8 @@ void LaneDetection::final_perspective(const Mat& color_warp, const Mat& original
   warpPerspective(color_warp, new_warp, Minv, color_warp.size(),INTER_LINEAR);
   addWeighted(original_image, 1, new_warp, 0.3, 0, output_image);
 }
+
+
 
 void LaneDetection::init(string file_name, string output_file)
 {
@@ -306,12 +381,12 @@ void LaneDetection::init(string file_name, string output_file)
 
 bool LaneDetection::frame_processing()
 {
-  Mat filtered_image;
+  Mat color_filtered_image, filtered_image_gray;
   Mat binary_warped;
   Mat histogram;
   Point left_peak, right_peak;
+  Mat new_left_fit, new_right_fit;
   Mat sliding_window_output;
-  Mat left_fit, right_fit;
   vector<float> plot_y, left_fit_x, right_fit_x;
   vector<Window> left_boxes, right_boxes;
   Mat color_warp = Mat::zeros(frame.size(), CV_8UC3);
@@ -319,14 +394,20 @@ bool LaneDetection::frame_processing()
   Mat Minv(2,4,CV_32FC2);
   Mat output_frame;
   Mat undistorted_frame;
+  int margin = 50;
+  Mat sobel_output;
 
   undistorted_frame = calibrator.undistort_image(frame);
-
   frame = undistorted_frame;
 
-  color_filter(filtered_image);
+  color_filter(color_filtered_image);
+  cvtColor(color_filtered_image, filtered_image_gray, COLOR_RGB2GRAY);
 
-  perspective_transform(filtered_image, binary_warped);
+  calculate_sobel(sobel_output);
+
+  bitwise_and(filtered_image_gray, sobel_output, filtered_image_gray);
+
+  perspective_transform(filtered_image_gray, binary_warped);
 
   get_histogram(binary_warped, histogram);
 
@@ -335,24 +416,38 @@ bool LaneDetection::frame_processing()
   if(first_frame ==  true)
   {
     sliding_window(binary_warped, left_peak, right_peak, sliding_window_output, left_boxes, right_boxes);
+    left_fit_lane = polyfit_windows(left_boxes);
+    right_fit_lane = polyfit_windows(right_boxes);
+
+    plot_y = linspace(0.0, (float)sliding_window_output.rows - 1, sliding_window_output.rows);
+
+    poly_fit_x(plot_y, left_fit_x, left_fit_lane);
+    poly_fit_x(plot_y, right_fit_x, right_fit_lane);
+
+    first_frame  = false;
 
   } else 
   {
-    non_sliding_window(binary_warped, left_peak, right_peak, sliding_window_output, left_boxes, right_boxes);
-  }
+    non_sliding_window(binary_warped, left_fit_lane, right_fit_lane, new_left_fit, new_right_fit, margin);
+
+    plot_y = linspace(0.0, (float)binary_warped.rows - 1, binary_warped.rows);
+
+    poly_fit_x(plot_y, left_fit_x, new_left_fit);
+    poly_fit_x(plot_y, right_fit_x, new_right_fit);
   
-
-  left_fit = polyfit_windows(left_boxes);
-  right_fit = polyfit_windows(right_boxes);
-
-  plot_y = linspace(0.0, (float)sliding_window_output.rows - 1, sliding_window_output.rows);
-
-  poly_fit_x(plot_y, left_fit_x, left_fit);
-  poly_fit_x(plot_y, right_fit_x, right_fit);
+  }
 
   get_inverse_points(plot_y, left_fit_x, right_fit_x, color_warp);
 
-  inverse_perspective(sliding_window_output, Minv, inverse_perspective_output);
+  if(first_frame == true)
+  {
+    inverse_perspective(sliding_window_output, Minv, inverse_perspective_output);
+
+  } else
+  {
+    inverse_perspective(binary_warped, Minv, inverse_perspective_output);
+  }
+
 
   final_perspective(color_warp, frame, Minv, output_frame);
 

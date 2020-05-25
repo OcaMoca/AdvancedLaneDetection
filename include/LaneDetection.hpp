@@ -20,6 +20,9 @@ class LaneDetection
         VideoCapture capture;
         VideoWriter video_output;
         Mat frame;
+
+        Mat left_fit_lane, right_fit_lane;
+
         CameraCalibration calibrator;
 
         float trap_bottom_width; 
@@ -38,11 +41,13 @@ class LaneDetection
 
         void trapezoid_roi();
         void color_filter(Mat&);
+        void calculate_sobel(Mat&);
         void perspective_transform(const Mat&, Mat&);
         void get_histogram(Mat const&, Mat&);
         void calculate_lane_histogram(const Mat&, Point&, Point&);
         void sliding_window(Mat&, Point&, Point&, Mat&, vector<Window>&, vector<Window>&);
-        void non_sliding_window(Mat&, Point&, Point&, Mat&, vector<Window>&, vector<Window>&);
+        void calculate_lane_fit_next_frame(vector<Point2f>, Mat&, vector<float>&, vector<float>&, int); 
+        void non_sliding_window(Mat&, Mat&, Mat&, Mat&,  Mat&, int);
         void get_inverse_points(vector<float>&, vector<float>&, vector<float>&, Mat&);
         void inverse_perspective(const Mat&, Mat&, Mat&);
         void final_perspective(const Mat&, const Mat&, Mat&, Mat&);
