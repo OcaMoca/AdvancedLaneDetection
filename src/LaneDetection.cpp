@@ -7,6 +7,7 @@ LaneDetection::LaneDetection()
   trap_height = 0.38f;
   car_hood = 50;
   first_frame = true;
+  
 
 }
 
@@ -342,6 +343,72 @@ void LaneDetection::final_perspective(const Mat& color_warp, const Mat& original
 }
 
 
+float LaneDetection::calculate_curvature(Mat& lane_fit, int height)
+{
+  float derivate_1, derivate_2;
+  float R_curve;
+
+  if(lane_fit.empty()) return 0;
+
+  vector<float> ploty = linspace(0, height - 1, height);
+  float y_eval = height - 1;
+  
+  float ym_per_pix = 30.0 / 720;
+  float xm_per_pix = 3.7 / 700; 
+
+  vector<float> xs;
+  poly_fit_x(ploty, xs, lane_fit);
+
+  Mat x(xs);
+  Mat y(ploty);
+
+  x.convertTo(x, CV_32F);
+  y.convertTo(y, CV_32F);
+
+  Mat poly_curvate = cv::Mat::zeros(3,1,CV_32F);
+
+  polyfit(y * ym_per_pix, x * xm_per_pix, poly_curvate, 2);
+
+  derivate_1 = 2 * poly_curvate.at<float>(2,0)  * y_eval * ym_per_pix + poly_curvate.at<float>(1,0); // f'(y) = 2Ay + B
+  derivate_2 = 2 * poly_curvate.at<float>(2,0);  // f''(y) = 2A
+
+  R_curve = pow((1 + pow(derivate_1, 2)), 1.5) / abs(derivate_2); //R_curve = (1 + (2Ay + B)^2)^3/2 / |2A|
+
+  return R_curve;
+
+}
+
+
+Mat LaneDetection::convert_to_optical()
+{
+  Mat prev_frame_gray, curr_frame_gray;
+
+  cvtColor(prev_frame, prev_frame_gray, COLOR_BGR2GRAY);
+  cvtColor(frame, curr_frame_gray, COLOR_BGR2GRAY);
+
+  Mat flow(curr_frame_gray.size(), CV_32FC2);
+  calcOpticalFlowFarneback(curr_frame_gray, curr_frame_gray, flow, 0.5, 3, 15, 3, 5, 1.2, 0);
+
+  // visualization
+  Mat flow_parts[2];
+  split(flow, flow_parts);
+  Mat magnitude, angle, magn_norm;
+  cartToPolar(flow_parts[0], flow_parts[1], magnitude, angle, true);
+  normalize(magnitude, magn_norm, 0.0f, 1.0f, NORM_MINMAX);
+  angle *= ((1.f / 360.f) * (180.f / 255.f));
+
+  //build hsv image
+  Mat _hsv[3], hsv, hsv8, flow_image_bgr;
+  _hsv[0] = angle;
+  _hsv[1] = Mat::ones(angle.size(), CV_32F);
+  _hsv[2] = magn_norm;
+  merge(_hsv, 3, hsv);
+  hsv.convertTo(hsv8, CV_8U, 255.0);
+  cvtColor(hsv8, flow_image_bgr, COLOR_HSV2BGR);
+
+  return flow_image_bgr;
+
+}
 
 void LaneDetection::init(string file_name, string output_file)
 {
@@ -396,6 +463,7 @@ bool LaneDetection::frame_processing()
   Mat undistorted_frame;
   int margin = 50;
   Mat sobel_output;
+  float R_curve_left, R_curve_right, R_curve_avg;
 
   undistorted_frame = calibrator.undistort_image(frame);
   frame = undistorted_frame;
@@ -424,6 +492,11 @@ bool LaneDetection::frame_processing()
     poly_fit_x(plot_y, left_fit_x, left_fit_lane);
     poly_fit_x(plot_y, right_fit_x, right_fit_lane);
 
+    R_curve_left = calculate_curvature(left_fit_lane, frame.rows);
+    R_curve_right = calculate_curvature(right_fit_lane, frame.rows);
+
+    R_curve_avg = (R_curve_left + R_curve_right) / 2;
+
     first_frame  = false;
 
   } else 
@@ -434,6 +507,11 @@ bool LaneDetection::frame_processing()
 
     poly_fit_x(plot_y, left_fit_x, new_left_fit);
     poly_fit_x(plot_y, right_fit_x, new_right_fit);
+
+    R_curve_left = calculate_curvature(new_left_fit, frame.rows);
+    R_curve_right = calculate_curvature(new_right_fit, frame.rows);
+
+    R_curve_avg = (R_curve_left + R_curve_right) / 2;
   
   }
 
@@ -450,6 +528,12 @@ bool LaneDetection::frame_processing()
 
 
   final_perspective(color_warp, frame, Minv, output_frame);
+
+
+
+  char radius_text[400];
+  sprintf(radius_text, "Radius of curvature: %f m", R_curve_avg);
+  cv::putText(output_frame, radius_text, Point2f(50,50), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,0,0));
 
   video_output.write(output_frame);
 

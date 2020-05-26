@@ -19,7 +19,9 @@ class LaneDetection
 
         VideoCapture capture;
         VideoWriter video_output;
+
         Mat frame;
+        Mat prev_frame;
 
         Mat left_fit_lane, right_fit_lane;
 
@@ -51,6 +53,8 @@ class LaneDetection
         void get_inverse_points(vector<float>&, vector<float>&, vector<float>&, Mat&);
         void inverse_perspective(const Mat&, Mat&, Mat&);
         void final_perspective(const Mat&, const Mat&, Mat&, Mat&);
+        float calculate_curvature(Mat&, int);
+        Mat convert_to_optical();
         
     public:
 

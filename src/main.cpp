@@ -4,8 +4,8 @@ int main() {
 
     bool processed;
 
-    string file_name = "test_videos/solidYellowLeft.mp4";
-    string output_file = "test_videos_output/solidYellowLeft_out.mp4";
+    string file_name = "test_videos/challenge.mp4";
+    string output_file = "test_videos_output/challenge_out.mp4";
 
     LaneDetection ld;
 
