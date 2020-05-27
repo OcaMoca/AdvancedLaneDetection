@@ -368,45 +368,63 @@ float LaneDetection::calculate_curvature(Mat& lane_fit, int height)
   Mat poly_curvate = cv::Mat::zeros(3,1,CV_32F);
 
   polyfit(y * ym_per_pix, x * xm_per_pix, poly_curvate, 2);
+  
 
   derivate_1 = 2 * poly_curvate.at<float>(2,0)  * y_eval * ym_per_pix + poly_curvate.at<float>(1,0); // f'(y) = 2Ay + B
   derivate_2 = 2 * poly_curvate.at<float>(2,0);  // f''(y) = 2A
 
-  R_curve = pow((1 + pow(derivate_1, 2)), 1.5) / abs(derivate_2); //R_curve = (1 + (2Ay + B)^2)^3/2 / |2A|
+  R_curve = pow((1 + pow(derivate_1, 2)), 1.5) / derivate_2; //R_curve = (1 + (2Ay + B)^2)^3/2 / |2A|
 
   return R_curve;
 
 }
 
 
-Mat LaneDetection::convert_to_optical()
+Mat LaneDetection::convert_to_optical(Mat& img)
 {
   Mat prev_frame_gray, curr_frame_gray;
+  Mat output;
+
+  vector<Point2f> p0, p1, good_new;
+
+    vector<Scalar> colors;
+    RNG rng;
+    for(int i = 0; i < 100; i++)
+    {
+        int r = rng.uniform(0, 256);
+        int g = rng.uniform(0, 256);
+        int b = rng.uniform(0, 256);
+        colors.push_back(Scalar(r,g,b));
+    }
 
   cvtColor(prev_frame, prev_frame_gray, COLOR_BGR2GRAY);
-  cvtColor(frame, curr_frame_gray, COLOR_BGR2GRAY);
 
-  Mat flow(curr_frame_gray.size(), CV_32FC2);
-  calcOpticalFlowFarneback(curr_frame_gray, curr_frame_gray, flow, 0.5, 3, 15, 3, 5, 1.2, 0);
+  cvtColor(img, curr_frame_gray, COLOR_BGR2GRAY);
 
-  // visualization
-  Mat flow_parts[2];
-  split(flow, flow_parts);
-  Mat magnitude, angle, magn_norm;
-  cartToPolar(flow_parts[0], flow_parts[1], magnitude, angle, true);
-  normalize(magnitude, magn_norm, 0.0f, 1.0f, NORM_MINMAX);
-  angle *= ((1.f / 360.f) * (180.f / 255.f));
+  goodFeaturesToTrack(prev_frame_gray, p0, 100, 0.3, 7, Mat(), 7, false, 0.04);
 
-  //build hsv image
-  Mat _hsv[3], hsv, hsv8, flow_image_bgr;
-  _hsv[0] = angle;
-  _hsv[1] = Mat::ones(angle.size(), CV_32F);
-  _hsv[2] = magn_norm;
-  merge(_hsv, 3, hsv);
-  hsv.convertTo(hsv8, CV_8U, 255.0);
-  cvtColor(hsv8, flow_image_bgr, COLOR_HSV2BGR);
+  Mat mask = Mat::zeros(prev_frame.size(), prev_frame.type());
 
-  return flow_image_bgr;
+  vector<uchar> status;
+  vector<float> error;
+  TermCriteria criteria = TermCriteria((TermCriteria::COUNT) + (TermCriteria::EPS), 10, 0.03);
+
+  calcOpticalFlowPyrLK(prev_frame_gray, curr_frame_gray, p0, p1, status, error, Size(15, 15), 2, criteria);
+
+  for(int i = 0; i < p0.size(); i++)
+  {
+    if(status[i] == 1)
+    {
+      good_new.push_back(p1[i]);
+      line(mask, p1[i], p0[i], colors[i], 2);
+      circle(img, p1[i], 5, colors[i], -1);
+    }
+  }
+
+  add(img, mask, output);
+  p0 = good_new;
+
+  return output;
 
 }
 
@@ -464,6 +482,7 @@ bool LaneDetection::frame_processing()
   int margin = 50;
   Mat sobel_output;
   float R_curve_left, R_curve_right, R_curve_avg;
+  Mat optical_out;
 
   undistorted_frame = calibrator.undistort_image(frame);
   frame = undistorted_frame;
@@ -499,6 +518,8 @@ bool LaneDetection::frame_processing()
 
     first_frame  = false;
 
+    prev_frame = sliding_window_output;
+
   } else 
   {
     non_sliding_window(binary_warped, left_fit_lane, right_fit_lane, new_left_fit, new_right_fit, margin);
@@ -512,7 +533,13 @@ bool LaneDetection::frame_processing()
     R_curve_right = calculate_curvature(new_right_fit, frame.rows);
 
     R_curve_avg = (R_curve_left + R_curve_right) / 2;
-  
+
+    cvtColor(binary_warped, binary_warped, COLOR_GRAY2BGR);
+
+    optical_out = convert_to_optical(binary_warped);
+
+    prev_frame = binary_warped;
+
   }
 
   get_inverse_points(plot_y, left_fit_x, right_fit_x, color_warp);
@@ -529,11 +556,10 @@ bool LaneDetection::frame_processing()
 
   final_perspective(color_warp, frame, Minv, output_frame);
 
-
-
   char radius_text[400];
   sprintf(radius_text, "Radius of curvature: %f m", R_curve_avg);
   cv::putText(output_frame, radius_text, Point2f(50,50), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,0,0));
+
 
   video_output.write(output_frame);
 

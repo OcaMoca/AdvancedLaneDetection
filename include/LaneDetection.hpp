@@ -54,7 +54,7 @@ class LaneDetection
         void inverse_perspective(const Mat&, Mat&, Mat&);
         void final_perspective(const Mat&, const Mat&, Mat&, Mat&);
         float calculate_curvature(Mat&, int);
-        Mat convert_to_optical();
+        Mat convert_to_optical(Mat&);
         
     public:
 
