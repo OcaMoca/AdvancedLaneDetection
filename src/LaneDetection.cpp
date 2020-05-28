@@ -368,24 +368,57 @@ float LaneDetection::calculate_curvature(Mat& lane_fit, int height)
   Mat poly_curvate = cv::Mat::zeros(3,1,CV_32F);
 
   polyfit(y * ym_per_pix, x * xm_per_pix, poly_curvate, 2);
-  
 
   derivate_1 = 2 * poly_curvate.at<float>(2,0)  * y_eval * ym_per_pix + poly_curvate.at<float>(1,0); // f'(y) = 2Ay + B
   derivate_2 = 2 * poly_curvate.at<float>(2,0);  // f''(y) = 2A
 
-  R_curve = pow((1 + pow(derivate_1, 2)), 1.5) / derivate_2; //R_curve = (1 + (2Ay + B)^2)^3/2 / |2A|
+  R_curve = pow((1 + pow(derivate_1, 2)), 1.5) / derivate_2; //R_curve = (1 + (2Ay + B)^2)^3/2 / 2A
+
+  if(R_curve > 1000 || R_curve < -1000)
+    R_curve = pow((1 + pow(derivate_1, 2)), 1.5) / abs(derivate_2); //R_curve = (1 + (2Ay + B)^2)^3/2 / |2A|
 
   return R_curve;
 
 }
 
+float LaneDetection::trim_mean(vector<float>& array, float pertentage)
+{
+  float average;
+  float num_to_remove = array.size() * pertentage / 100.0;
 
-Mat LaneDetection::convert_to_optical(Mat& img)
+  array.begin() = array.begin() + num_to_remove;
+  array.end() = array.end() - num_to_remove;
+
+  array.resize(array.size() - 2*num_to_remove);
+
+  average = accumulate( array.begin(), array.end(), 0.0) / array.size();
+  
+  return average;
+
+}
+
+
+float LaneDetection::convert_to_optical(Mat& img)
 {
   Mat prev_frame_gray, curr_frame_gray;
   Mat output;
 
+  float x1_meter; 
+  float x2_meter; 
+  float y1_meter; 
+  float y2_meter;
+
+  vector<float> distance;
+  float time = 1 / 25.0;
+  vector<float> speed;
+
+  float speed_avg;
+  float distance_avg;
+
   vector<Point2f> p0, p1, good_new;
+
+  float ym_per_pix = 30.0 / 720;
+  float xm_per_pix = 3.7 / 700; 
 
     vector<Scalar> colors;
     RNG rng;
@@ -401,7 +434,7 @@ Mat LaneDetection::convert_to_optical(Mat& img)
 
   cvtColor(img, curr_frame_gray, COLOR_BGR2GRAY);
 
-  goodFeaturesToTrack(prev_frame_gray, p0, 100, 0.3, 7, Mat(), 7, false, 0.04);
+  goodFeaturesToTrack(prev_frame_gray, p0, 1000, 0.3, 7, Mat(), 7, false, 0.04);
 
   Mat mask = Mat::zeros(prev_frame.size(), prev_frame.type());
 
@@ -415,16 +448,39 @@ Mat LaneDetection::convert_to_optical(Mat& img)
   {
     if(status[i] == 1)
     {
+    
+      if((p1[i] - p0[i]).x > 5 || (p1[i] - p0[i]).x < -5 || (p1[i] - p0[i]).y < 1)
+        continue;
+
       good_new.push_back(p1[i]);
       line(mask, p1[i], p0[i], colors[i], 2);
       circle(img, p1[i], 5, colors[i], -1);
     }
+
+    x1_meter = xm_per_pix * p1[i].x;
+    x2_meter = xm_per_pix * p0[i].x;
+
+    y1_meter = ym_per_pix * p1[i].y;
+    y2_meter = ym_per_pix * p0[i].y;
+
+    distance.push_back((pow(x1_meter - x2_meter, 2) + pow(y1_meter - y2_meter, 2)));
+
+    //speed.push_back(distance / time * 3.6);
+
   }
+
+  distance_avg = trim_mean(distance, 0.3);
+
+  //speed_avg = accumulate( speed.begin(), speed.end(), 0.0) / speed.size();
+  speed_avg = distance_avg / time * 3.6;
+
+  cout << speed_avg << endl;
+
 
   add(img, mask, output);
   p0 = good_new;
 
-  return output;
+  return speed_avg;
 
 }
 
@@ -483,6 +539,7 @@ bool LaneDetection::frame_processing()
   Mat sobel_output;
   float R_curve_left, R_curve_right, R_curve_avg;
   Mat optical_out;
+  float speed;
 
   undistorted_frame = calibrator.undistort_image(frame);
   frame = undistorted_frame;
@@ -536,7 +593,7 @@ bool LaneDetection::frame_processing()
 
     cvtColor(binary_warped, binary_warped, COLOR_GRAY2BGR);
 
-    optical_out = convert_to_optical(binary_warped);
+    speed = convert_to_optical(binary_warped);
 
     prev_frame = binary_warped;
 
@@ -556,10 +613,14 @@ bool LaneDetection::frame_processing()
 
   final_perspective(color_warp, frame, Minv, output_frame);
 
-  char radius_text[400];
-  sprintf(radius_text, "Radius of curvature: %f m", R_curve_avg);
-  cv::putText(output_frame, radius_text, Point2f(50,50), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,0,0));
+  char radius_text[200];
+  char speed_text[200];
+  char text[400];
+  sprintf(radius_text, "Radius of curvature: %f m\n\n", R_curve_avg);
+  sprintf(radius_text, "Car speed: %f km/h", speed);
+  sprintf(text, "Radius of curvature: %f m\n\nCar speed: %f km/h ", R_curve_avg, speed);
 
+  cv::putText(output_frame, text, Point2f(50,50), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,0,0));
 
   video_output.write(output_frame);
 
