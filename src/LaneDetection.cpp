@@ -7,7 +7,8 @@ LaneDetection::LaneDetection()
   trap_height = 0.38f;
   car_hood = 50;
   first_frame = true;
-  
+
+  result_optical = 0.0;
 
 }
 
@@ -29,7 +30,8 @@ void LaneDetection::color_filter(Mat& filtered_image)
     cv::bitwise_and(frame, frame, yellow_image, mask2); 
     
     addWeighted(white_image, 1., yellow_image, 1., 0., filtered_image);
-    
+
+    return;
 }
 
  void LaneDetection::calculate_sobel(Mat& sobel_output)
@@ -54,9 +56,7 @@ void LaneDetection::color_filter(Mat& filtered_image)
    addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0 , sobel_output);
 
    return;
-
  }
-
 
 void LaneDetection::trapezoid_roi()
 {
@@ -74,14 +74,12 @@ void LaneDetection::trapezoid_roi()
     warped_roi.push_back(Point2f( width - (width * (1 - trap_bottom_width)) / 2, (float)height));
 
     return;
-
 }
 
 void LaneDetection::perspective_transform(const Mat& filtered_image_gray, Mat& binary_warped)
 {
   Mat binary_threshold;
   Mat M(2,4,CV_32FC2);
-  
 
   M = getPerspectiveTransform(original_roi, warped_roi);
   
@@ -90,10 +88,10 @@ void LaneDetection::perspective_transform(const Mat& filtered_image_gray, Mat& b
 
   warpPerspective(binary_threshold, binary_warped, M, filtered_image_gray.size(), INTER_LINEAR);
   
-
+  return;
 }
 
-void LaneDetection::get_histogram(Mat const& binary_warped, Mat& histogram)
+void LaneDetection::get_histogram(const Mat& binary_warped, Mat& histogram)
 {
   cv::Mat half_image = binary_warped(cv::Rect(0, binary_warped.rows / 2, binary_warped.cols, binary_warped.rows / 2));
 	cv::reduce(half_image / 255, histogram, 0, REDUCE_SUM, CV_32FC1);
@@ -114,9 +112,11 @@ void LaneDetection::calculate_lane_histogram(const Mat& histogram, Point& left_p
   minMaxLoc(right_x_base,NULL, NULL, NULL, &right_peak);
 
   right_peak = right_peak + Point(midpoint, 0);
+
+  return;
 }
 
-void LaneDetection::sliding_window(Mat& binary_warped, Point& left_peak, Point& right_peak, Mat& output_image, vector<Window>& left_boxes, vector<Window>& right_boxes)
+void LaneDetection::sliding_window(Mat& binary_warped, const Point& left_peak, const Point& right_peak, Mat& sliding_window_output, vector<Window>& left_boxes, vector<Window>& right_boxes)
 {
   int N_windows;
   int window_width;
@@ -133,24 +133,24 @@ void LaneDetection::sliding_window(Mat& binary_warped, Point& left_peak, Point& 
   Window window_left(binary_warped, left_peak.x, binary_warped.rows - window_height, window_width, window_height, 50);
   Window window_right(binary_warped, right_peak.x, binary_warped.rows - window_height, window_width, window_height, 50);
 
-  cvtColor(binary_warped, output_image, COLOR_GRAY2RGB);
+  cvtColor(binary_warped, sliding_window_output, COLOR_GRAY2RGB);
 
   for(int i = 0; i < N_windows; i++)
   {
-      rectangle(output_image, window_left.get_bottom_left_point(), window_left.get_top_right_point(), Scalar(0,255, 0), 2);
-      rectangle(output_image, window_right.get_bottom_left_point(), window_right.get_top_right_point(), Scalar(0,255, 0), 2);
+      rectangle(sliding_window_output, window_left.get_bottom_left_point(), window_left.get_top_right_point(), Scalar(0,255, 0), 2);
+      rectangle(sliding_window_output, window_right.get_bottom_left_point(), window_right.get_top_right_point(), Scalar(0,255, 0), 2);
 
       left_boxes.push_back(window_left);
       right_boxes.push_back(window_right);
       
       window_left = window_left.get_next_window(gray_tmp);
       window_right = window_right.get_next_window(gray_tmp);
-
   }
 
+  return;
 }
 
-Mat LaneDetection::polyfit_windows(vector<Window> const& windows)
+Mat LaneDetection::polyfit_windows(const vector<Window>& windows)
 {
 	int n = (int)windows.size();
 
@@ -178,7 +178,6 @@ Mat LaneDetection::polyfit_windows(vector<Window> const& windows)
 	polyfit(ys, xs, fit, 2);
 
 	return fit;
-
 }
 
 void LaneDetection::calculate_lane_fit_next_frame(vector<Point2f> non_zero, Mat& lane_fit, vector<float>& xs, vector<float>& ys, int margin) 
@@ -202,10 +201,9 @@ void LaneDetection::calculate_lane_fit_next_frame(vector<Point2f> non_zero, Mat&
   }
 
   return;
-
 }
 
-void LaneDetection::non_sliding_window(Mat& binary_warped, Mat& left_fit, Mat& right_fit, Mat& new_left_fit,  Mat& new_right_fit, int margin)
+void LaneDetection::non_sliding_window(const Mat& binary_warped, Mat& left_fit, Mat& right_fit, Mat& new_left_fit, Mat& new_right_fit, int margin)
 {
   vector<Point2f> non_zero;
   cv::findNonZero(binary_warped, non_zero);
@@ -237,7 +235,6 @@ void LaneDetection::non_sliding_window(Mat& binary_warped, Mat& left_fit, Mat& r
   } 
 
   return;
-
 }
 
 void LaneDetection::polyfit(const Mat& src_x, const Mat& src_y, Mat& dst, int order)
@@ -267,6 +264,7 @@ void LaneDetection::polyfit(const Mat& src_x, const Mat& src_y, Mat& dst, int or
 
 	W.copyTo(dst);
 
+  return;
 }
 
 vector<float> LaneDetection::linspace(float start_in, float end_in, int num_in)
@@ -295,9 +293,9 @@ vector<float> LaneDetection::linspace(float start_in, float end_in, int num_in)
   return linspaced;
 }
 
-void LaneDetection::poly_fit_x(vector<float> const& ploty, vector<float>& fit_x, Mat const& line_fit)
+void LaneDetection::poly_fit_x(const vector<float>& plot_y, vector<float>& fit_x, const Mat& line_fit)
 {
-	for (auto const& y : ploty) {
+	for (auto const& y : plot_y) {
 		float x = line_fit.at<float>(2, 0) * y * y + line_fit.at<float>(1, 0) * y + line_fit.at<float>(0, 0);
 		fit_x.push_back(x);
 	}
@@ -305,16 +303,17 @@ void LaneDetection::poly_fit_x(vector<float> const& ploty, vector<float>& fit_x,
 	return;
 }
 
-void LaneDetection::inverse_perspective(const Mat& warped_output, Mat& Minv, Mat& output_image)
+void LaneDetection::original_perspective(const Mat& warped_output, Mat& Minv, Mat& original_perspective_output)
 {
   Mat color_warp = Mat::zeros(warped_output.size(), CV_8UC3);
 
   Minv = getPerspectiveTransform(warped_roi, original_roi);
-  warpPerspective(warped_output, output_image, Minv, warped_output.size(),INTER_LINEAR);
+  warpPerspective(warped_output, original_perspective_output, Minv, warped_output.size(),INTER_LINEAR);
 
+  return;
 }
 
-void LaneDetection::get_inverse_points(vector<float>& plot_y, vector<float>& left_fit_x, vector<float>& right_fit_x, Mat& color_warp)
+void LaneDetection::get_inverse_points(const vector<float>& plot_y, const vector<float>& left_fit_x, const vector<float>& right_fit_x, Mat& color_warp_output)
 {
   vector<Point2f> pts_left;
   vector<Point2f>  pts_right;
@@ -331,19 +330,22 @@ void LaneDetection::get_inverse_points(vector<float>& plot_y, vector<float>& lef
 
   vector<vector<Point>> ptsarray{ pts };
 
-  fillPoly(color_warp, ptsarray, Scalar(0, 255, 0));
+  fillPoly(color_warp_output, ptsarray, Scalar(0, 255, 0));
+
+  return;
 }
 
-void LaneDetection::final_perspective(const Mat& color_warp, const Mat& original_image, Mat& Minv, Mat& output_image)
+void LaneDetection::final_perspective(const Mat& color_warp, const Mat& original_image, Mat& Minv, Mat& final_perspective_output)
 {
   Mat new_warp;
 
   warpPerspective(color_warp, new_warp, Minv, color_warp.size(),INTER_LINEAR);
-  addWeighted(original_image, 1, new_warp, 0.3, 0, output_image);
+  addWeighted(original_image, 1, new_warp, 0.3, 0, final_perspective_output);
+
+  return;
 }
 
-
-float LaneDetection::calculate_curvature(Mat& lane_fit, int height)
+float LaneDetection::calculate_curvature(const Mat& lane_fit, int height)
 {
   float derivate_1, derivate_2;
   float R_curve;
@@ -384,24 +386,29 @@ float LaneDetection::calculate_curvature(Mat& lane_fit, int height)
 float LaneDetection::trim_mean(vector<float>& array, float pertentage)
 {
   float average;
-  float num_to_remove = array.size() * pertentage / 100.0;
+  vector<float> array_tmp = array;
+  std::sort(array_tmp.begin(), array_tmp.end());
 
-  array.begin() = array.begin() + num_to_remove;
-  array.end() = array.end() - num_to_remove;
+  int num_to_remove = (array_tmp.size() * pertentage) / 2;
 
-  array.resize(array.size() - 2*num_to_remove);
+  array_tmp.begin() = array_tmp.begin() + num_to_remove;
+  array_tmp.end() = array_tmp.end() - num_to_remove;
 
-  average = accumulate( array.begin(), array.end(), 0.0) / array.size();
+  array_tmp.resize(array_tmp.size() - 2*num_to_remove);
+
+  average = accumulate( array_tmp.begin(), array_tmp.end(), 0.0) / array_tmp.size();
   
   return average;
 
 }
 
 
-float LaneDetection::convert_to_optical(Mat& img)
+void LaneDetection::convert_to_optical(const Mat& curr_frame, Mat& convert_to_optical_output)
 {
   Mat prev_frame_gray, curr_frame_gray;
-  Mat output;
+
+  vector<uchar> status;
+  vector<float> error;
 
   float x1_meter; 
   float x2_meter; 
@@ -409,13 +416,13 @@ float LaneDetection::convert_to_optical(Mat& img)
   float y2_meter;
 
   vector<float> distance;
-  float time = 1 / 25.0;
+  float time = 1 / 60.0;
   vector<float> speed;
 
   float speed_avg;
   float distance_avg;
 
-  vector<Point2f> p0, p1, good_new;
+  vector<Point2f> new_point_vector, good_new;
 
   float ym_per_pix = 30.0 / 720;
   float xm_per_pix = 3.7 / 700; 
@@ -432,56 +439,59 @@ float LaneDetection::convert_to_optical(Mat& img)
 
   cvtColor(prev_frame, prev_frame_gray, COLOR_BGR2GRAY);
 
-  cvtColor(img, curr_frame_gray, COLOR_BGR2GRAY);
+  cvtColor(curr_frame, curr_frame_gray, COLOR_BGR2GRAY);
 
-  goodFeaturesToTrack(prev_frame_gray, p0, 1000, 0.3, 7, Mat(), 7, false, 0.04);
+  goodFeaturesToTrack(prev_frame_gray, old_point_vector, 300, 0.3, 7, Mat(), 7, false, 0.04);
 
   Mat mask = Mat::zeros(prev_frame.size(), prev_frame.type());
-
-  vector<uchar> status;
-  vector<float> error;
+  
   TermCriteria criteria = TermCriteria((TermCriteria::COUNT) + (TermCriteria::EPS), 10, 0.03);
 
-  calcOpticalFlowPyrLK(prev_frame_gray, curr_frame_gray, p0, p1, status, error, Size(15, 15), 2, criteria);
+  calcOpticalFlowPyrLK(prev_frame_gray, curr_frame_gray, old_point_vector, new_point_vector, status, error, Size(15, 15), 2, criteria);
 
-  for(int i = 0; i < p0.size(); i++)
+  for(int i = 0; i < old_point_vector.size(); i++)
   {
     if(status[i] == 1)
     {
     
-      if((p1[i] - p0[i]).x > 5 || (p1[i] - p0[i]).x < -5 || (p1[i] - p0[i]).y < 1)
+      if((new_point_vector[i] - old_point_vector[i]).x > 5 || (new_point_vector[i] - old_point_vector[i]).x < -5 || (new_point_vector[i] - old_point_vector[i]).y < 5)
         continue;
 
-      good_new.push_back(p1[i]);
-      line(mask, p1[i], p0[i], colors[i], 2);
-      circle(img, p1[i], 5, colors[i], -1);
+      good_new.push_back(new_point_vector[i]);
+      line(mask, new_point_vector[i], old_point_vector[i], colors[i], 2);
+      circle(curr_frame, new_point_vector[i], 5, colors[i], -1);
+
+      x1_meter = xm_per_pix * new_point_vector[i].x;
+      x2_meter = xm_per_pix * old_point_vector[i].x;
+
+      y1_meter = ym_per_pix * new_point_vector[i].y;
+      y2_meter = ym_per_pix * old_point_vector[i].y;
+
+      distance.push_back(sqrt(pow(x1_meter - x2_meter, 2) + pow(y1_meter - y2_meter, 2)));
     }
-
-    x1_meter = xm_per_pix * p1[i].x;
-    x2_meter = xm_per_pix * p0[i].x;
-
-    y1_meter = ym_per_pix * p1[i].y;
-    y2_meter = ym_per_pix * p0[i].y;
-
-    distance.push_back((pow(x1_meter - x2_meter, 2) + pow(y1_meter - y2_meter, 2)));
-
-    //speed.push_back(distance / time * 3.6);
 
   }
 
-  distance_avg = trim_mean(distance, 0.3);
+  if(distance.size() == 0)
+  {
+    return;
+  }
 
-  //speed_avg = accumulate( speed.begin(), speed.end(), 0.0) / speed.size();
+  distance_avg = trim_mean(distance, 0.2);
+
   speed_avg = distance_avg / time * 3.6;
+  succ_avg_speed.push_back(speed_avg);
 
-  cout << speed_avg << endl;
+  if(succ_avg_speed.size() == 50)
+  {
+    result_optical = (int)trim_mean(succ_avg_speed, 0.2);
+    succ_avg_speed.erase(succ_avg_speed.begin());
+  } 
+ 
+  add(curr_frame, mask, convert_to_optical_output);
+  old_point_vector = good_new;
 
-
-  add(img, mask, output);
-  p0 = good_new;
-
-  return speed_avg;
-
+  return;
 }
 
 void LaneDetection::init(string file_name, string output_file)
@@ -502,9 +512,8 @@ void LaneDetection::init(string file_name, string output_file)
       return;
   }
 
-
   vector<string> chessboard_images;
-  cv::glob("/home/Olivera/LaneDetectionBCs/camera_cal/*.jpg", chessboard_images);
+  cv::glob("../camera_cal/*.jpg", chessboard_images);
 
   bool success;
   int error;
@@ -518,6 +527,7 @@ void LaneDetection::init(string file_name, string output_file)
   if(capture.read(frame))
     trapezoid_roi();
 
+  return;
 }
 
 bool LaneDetection::frame_processing()
@@ -539,7 +549,7 @@ bool LaneDetection::frame_processing()
   Mat sobel_output;
   float R_curve_left, R_curve_right, R_curve_avg;
   Mat optical_out;
-  float speed;
+  int speed;
 
   undistorted_frame = calibrator.undistort_image(frame);
   frame = undistorted_frame;
@@ -593,7 +603,7 @@ bool LaneDetection::frame_processing()
 
     cvtColor(binary_warped, binary_warped, COLOR_GRAY2BGR);
 
-    speed = convert_to_optical(binary_warped);
+    convert_to_optical(binary_warped, optical_out);
 
     prev_frame = binary_warped;
 
@@ -603,25 +613,31 @@ bool LaneDetection::frame_processing()
 
   if(first_frame == true)
   {
-    inverse_perspective(sliding_window_output, Minv, inverse_perspective_output);
+    original_perspective(sliding_window_output, Minv, inverse_perspective_output);
 
   } else
   {
-    inverse_perspective(binary_warped, Minv, inverse_perspective_output);
+    original_perspective(binary_warped, Minv, inverse_perspective_output);
   }
 
 
   final_perspective(color_warp, frame, Minv, output_frame);
 
-  char radius_text[200];
-  char speed_text[200];
-  char text[400];
-  sprintf(radius_text, "Radius of curvature: %f m\n\n", R_curve_avg);
-  sprintf(radius_text, "Car speed: %f km/h", speed);
-  sprintf(text, "Radius of curvature: %f m\n\nCar speed: %f km/h ", R_curve_avg, speed);
+  char radius_text[100];
+  char speed_text[100];
+  char text[200];
+  sprintf(radius_text, "Radius of curvature: %f m", R_curve_avg);
+  sprintf(speed_text, "Car speed: %d km/h", result_optical);
 
-  cv::putText(output_frame, text, Point2f(50,50), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,0,0));
+  cv::putText(output_frame, radius_text, Point2f(50,50), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,0,0));
 
+  if(result_optical > 120)
+  {
+    cv::putText(output_frame, speed_text, Point2f(50,100), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,255,0));
+  } else {
+    cv::putText(output_frame, speed_text, Point2f(50,100), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,0,0));
+  }
+  
   video_output.write(output_frame);
 
   return capture.read(frame);
@@ -634,4 +650,5 @@ void LaneDetection::release()
   capture.release();
 	video_output.release();
 
+  return;
 }
