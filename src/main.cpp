@@ -4,8 +4,8 @@ int main() {
 
     bool processed;
 
-    string file_name = "test_videos/challenge.mp4";
-    string output_file = "test_videos_output/proba.mp4";
+    string file_name = "test_videos/prestrojavanje.mp4";
+    string output_file = "test_videos_output/prestrojavanje_test.mp4";
 
     LaneDetection ld;
 
@@ -15,12 +15,14 @@ int main() {
 
     while(true)
     {
+        
         processed = ld.frame_processing();
         if(!processed)
             break;
 
         cnt++; 
-
+        if(cnt == 200)
+            break;
         cout << cnt << endl;
 
     }

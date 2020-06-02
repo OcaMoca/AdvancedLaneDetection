@@ -61,6 +61,7 @@ class LaneDetection
         float calculate_curvature(const Mat&, int);
         float trim_mean(vector<float>& , float);
         void convert_to_optical(const Mat&, Mat&);
+        float calculate_car_offset(Mat&, Mat&, Mat&);
 
     public:
 

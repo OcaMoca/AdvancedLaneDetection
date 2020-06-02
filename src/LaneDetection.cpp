@@ -2,12 +2,22 @@
 
 LaneDetection::LaneDetection()
 {
-  trap_bottom_width = 0.7f; 
+  /*trap_bottom_width = 0.7f; 
   trap_top_width = 0.1f; 
   trap_height = 0.38f;
-  car_hood = 50;
-  first_frame = true;
+  car_hood = 50;*/
 
+  trap_bottom_width = 0.25f; 
+  trap_top_width = 0.05f; 
+  trap_height = 0.3f;
+  car_hood = 50;
+
+  /*trap_bottom_width = 0.3f; 
+  trap_top_width = 0.09f; 
+  trap_height = 0.3f;
+  car_hood = 50;*/
+
+  first_frame = true;
   result_optical = 0.0;
 
 }
@@ -20,7 +30,9 @@ void LaneDetection::color_filter(Mat& filtered_image)
     Mat white_image;
     Mat yellow_image;
 
-    cv::inRange(frame, Scalar(190,190,190), Scalar(255,255,255), mask1);
+    //cv::inRange(frame, Scalar(190,190,190), Scalar(255,255,255), mask1);
+
+    cv::inRange(frame, Scalar(80,80,80), Scalar(255,255,255), mask1);
 
     cvtColor(frame, image_hsv, COLOR_RGB2HSV);
     cv::inRange(image_hsv, Scalar(90,70,100), Scalar(110,255,255), mask2);
@@ -50,10 +62,11 @@ void LaneDetection::color_filter(Mat& filtered_image)
    Sobel(gray, grad_x, depth, 1, 0, 3, scale, delta, BORDER_DEFAULT);
    convertScaleAbs(grad_x, abs_grad_x);
 
-   Sobel(gray, grad_y, depth, 0, 1, 3, scale, delta, BORDER_DEFAULT);
-   convertScaleAbs(grad_y, abs_grad_y);
+   //Sobel(gray, grad_y, depth, 0, 1, 3, scale, delta, BORDER_DEFAULT);
+   //convertScaleAbs(grad_y, abs_grad_y);
 
-   addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0 , sobel_output);
+   //addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0 , sobel_output);
+   sobel_output = abs_grad_x;
 
    return;
  }
@@ -82,12 +95,15 @@ void LaneDetection::perspective_transform(const Mat& filtered_image_gray, Mat& b
   Mat M(2,4,CV_32FC2);
 
   M = getPerspectiveTransform(original_roi, warped_roi);
-  
+
   binary_threshold =  Mat::zeros(filtered_image_gray.rows, filtered_image_gray.cols, CV_8UC3);
   threshold(filtered_image_gray, binary_threshold, 0, 255, THRESH_BINARY);
 
   warpPerspective(binary_threshold, binary_warped, M, filtered_image_gray.size(), INTER_LINEAR);
   
+  //rectangle(binary_warped, Point(0,binary_warped.rows), Point(300,0), Scalar(0,0,0), FILLED);
+  //rectangle(binary_warped, Point(binary_warped.cols - 400, binary_warped.rows), Point(binary_warped.cols, 0), Scalar(0,0,0), FILLED);
+
   return;
 }
 
@@ -513,7 +529,7 @@ void LaneDetection::init(string file_name, string output_file)
   }
 
   vector<string> chessboard_images;
-  cv::glob("../camera_cal/*.jpg", chessboard_images);
+  cv::glob("/home/Olivera/LaneDetectionBCs/camera_cal/*.jpg", chessboard_images);
 
   bool success;
   int error;
@@ -528,6 +544,21 @@ void LaneDetection::init(string file_name, string output_file)
     trapezoid_roi();
 
   return;
+}
+
+float calculate_car_offset(Mat& undistorted, Mat& left_fit, Mat& right_fit)
+{
+  float bottom_y = undistorted.rows - 1;
+  float bottom_x_left = left_fit.at<float>(2, 0) * bottom_y * bottom_y + left_fit.at<float>(1, 0) * bottom_y + left_fit.at<float>(0, 0);
+  float bottom_x_right = right_fit.at<float>(2, 0) * bottom_y * bottom_y + right_fit.at<float>(1, 0) * bottom_y + right_fit.at<float>(0, 0);
+
+  float car_offset = undistorted.cols / 2 - (bottom_x_left + bottom_x_right) / 2;
+
+  float xm_per_pix = 3.7 / 700;
+  car_offset = car_offset * xm_per_pix;
+
+  return car_offset;
+
 }
 
 bool LaneDetection::frame_processing()
