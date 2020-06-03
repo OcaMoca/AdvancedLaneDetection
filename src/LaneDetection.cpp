@@ -7,18 +7,14 @@ LaneDetection::LaneDetection()
   trap_height = 0.38f;
   car_hood = 50;*/
 
-  trap_bottom_width = 0.25f; 
-  trap_top_width = 0.05f; 
-  trap_height = 0.3f;
-  car_hood = 50;
-
-  /*trap_bottom_width = 0.3f; 
-  trap_top_width = 0.09f; 
-  trap_height = 0.3f;
-  car_hood = 50;*/
+  trap_bottom_width = 0.28f; 
+	trap_top_width = 0.05f; 
+	trap_height = 0.3f;
+	car_hood = 150;
 
   first_frame = true;
   result_optical = 0.0;
+  wait_to_rearrange = 0;
 
 }
 
@@ -31,7 +27,6 @@ void LaneDetection::color_filter(Mat& filtered_image)
     Mat yellow_image;
 
     //cv::inRange(frame, Scalar(190,190,190), Scalar(255,255,255), mask1);
-
     cv::inRange(frame, Scalar(80,80,80), Scalar(255,255,255), mask1);
 
     cvtColor(frame, image_hsv, COLOR_RGB2HSV);
@@ -101,9 +96,6 @@ void LaneDetection::perspective_transform(const Mat& filtered_image_gray, Mat& b
 
   warpPerspective(binary_threshold, binary_warped, M, filtered_image_gray.size(), INTER_LINEAR);
   
-  //rectangle(binary_warped, Point(0,binary_warped.rows), Point(300,0), Scalar(0,0,0), FILLED);
-  //rectangle(binary_warped, Point(binary_warped.cols - 400, binary_warped.rows), Point(binary_warped.cols, 0), Scalar(0,0,0), FILLED);
-
   return;
 }
 
@@ -440,8 +432,8 @@ void LaneDetection::convert_to_optical(const Mat& curr_frame, Mat& convert_to_op
 
   vector<Point2f> new_point_vector, good_new;
 
-  float ym_per_pix = 30.0 / 720;
-  float xm_per_pix = 3.7 / 700; 
+  float ym_per_pix = 30.0 / 720; //30.0 / 720
+  float xm_per_pix = 3.7 / 700;  //3.7 / 700
 
     vector<Scalar> colors;
     RNG rng;
@@ -546,13 +538,13 @@ void LaneDetection::init(string file_name, string output_file)
   return;
 }
 
-float calculate_car_offset(Mat& undistorted, Mat& left_fit, Mat& right_fit)
+float LaneDetection::calculate_car_offset(Mat& undistorted, Mat& left_fit, Mat& right_fit)
 {
   float bottom_y = undistorted.rows - 1;
   float bottom_x_left = left_fit.at<float>(2, 0) * bottom_y * bottom_y + left_fit.at<float>(1, 0) * bottom_y + left_fit.at<float>(0, 0);
   float bottom_x_right = right_fit.at<float>(2, 0) * bottom_y * bottom_y + right_fit.at<float>(1, 0) * bottom_y + right_fit.at<float>(0, 0);
 
-  float car_offset = undistorted.cols / 2 - (bottom_x_left + bottom_x_right) / 2;
+  float car_offset = undistorted.cols / 2 - 100 - (bottom_x_left + bottom_x_right) / 2;
 
   float xm_per_pix = 3.7 / 700;
   car_offset = car_offset * xm_per_pix;
@@ -584,6 +576,14 @@ bool LaneDetection::frame_processing()
 
   undistorted_frame = calibrator.undistort_image(frame);
   frame = undistorted_frame;
+
+  if(wait_to_rearrange > 0 && wait_to_rearrange < 205)
+  {
+    first_frame = true;
+    wait_to_rearrange++;
+    video_output.write(frame);
+    return capture.read(frame);
+  }
 
   color_filter(color_filtered_image);
   cvtColor(color_filtered_image, filtered_image_gray, COLOR_RGB2GRAY);
@@ -654,11 +654,15 @@ bool LaneDetection::frame_processing()
 
   final_perspective(color_warp, frame, Minv, output_frame);
 
+  float car_offset;
+  car_offset = calculate_car_offset(undistorted_frame, left_fit_lane, right_fit_lane);
+
   char radius_text[100];
   char speed_text[100];
-  char text[200];
+  char car_offset_text[100];
   sprintf(radius_text, "Radius of curvature: %f m", R_curve_avg);
   sprintf(speed_text, "Car speed: %d km/h", result_optical);
+  sprintf(car_offset_text, "Car offset: %f m", car_offset);
 
   cv::putText(output_frame, radius_text, Point2f(50,50), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,0,0));
 
@@ -668,8 +672,15 @@ bool LaneDetection::frame_processing()
   } else {
     cv::putText(output_frame, speed_text, Point2f(50,100), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,0,0));
   }
+
+  cv::putText(output_frame, car_offset_text, Point2f(50,150), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,0,0));
   
   video_output.write(output_frame);
+
+  if(car_offset >= 1)
+  {
+    wait_to_rearrange++;
+  }
 
   return capture.read(frame);
 }

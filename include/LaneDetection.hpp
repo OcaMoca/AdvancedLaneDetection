@@ -41,6 +41,8 @@ class LaneDetection
         vector<Point2f> old_point_vector;
         int result_optical;
 
+        int wait_to_rearrange;
+
         void polyfit(const Mat&, const Mat&, Mat&, int);
         vector<float> linspace(float, float, int);
         Mat polyfit_windows(const vector<Window>&);
