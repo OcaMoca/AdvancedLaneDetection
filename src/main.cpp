@@ -5,7 +5,7 @@ int main() {
     bool processed;
 
     string file_name = "test_videos/prestrojavanje.mp4";
-    string output_file = "test_videos_output/prestrojavanje_out.mp4";
+    string output_file = "test_videos_output/prestrojavanje_out_test2.mp4";
 
     LaneDetection ld;
 

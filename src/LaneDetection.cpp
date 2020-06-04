@@ -57,11 +57,10 @@ void LaneDetection::color_filter(Mat& filtered_image)
    Sobel(gray, grad_x, depth, 1, 0, 3, scale, delta, BORDER_DEFAULT);
    convertScaleAbs(grad_x, abs_grad_x);
 
-   //Sobel(gray, grad_y, depth, 0, 1, 3, scale, delta, BORDER_DEFAULT);
-   //convertScaleAbs(grad_y, abs_grad_y);
+   Sobel(gray, grad_y, depth, 0, 1, 3, scale, delta, BORDER_DEFAULT);
+   convertScaleAbs(grad_y, abs_grad_y);
 
-   //addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0 , sobel_output);
-   sobel_output = abs_grad_x;
+   addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0 , sobel_output);
 
    return;
  }
@@ -76,7 +75,7 @@ void LaneDetection::trapezoid_roi()
     original_roi.push_back(Point2f( width - (width * (1 - trap_top_width)) / 2, height - height * trap_height));
     original_roi.push_back(Point2f( width - (width * (1 - trap_bottom_width)) / 2, height - car_hood));
 
-    warped_roi.push_back(Point2f( ( width * (1 - trap_bottom_width)) / 2 , (float)height));
+    warped_roi.push_back(Point2f( ( width * (1 - trap_bottom_width)) / 2  , (float)height));
     warped_roi.push_back(Point2f( ( width * (1 - trap_bottom_width)) / 2, 0.0));
     warped_roi.push_back(Point2f( width - (width * (1 - trap_bottom_width)) / 2, 0.0));
     warped_roi.push_back(Point2f( width - (width * (1 - trap_bottom_width)) / 2, (float)height));
@@ -95,7 +94,12 @@ void LaneDetection::perspective_transform(const Mat& filtered_image_gray, Mat& b
   threshold(filtered_image_gray, binary_threshold, 0, 255, THRESH_BINARY);
 
   warpPerspective(binary_threshold, binary_warped, M, filtered_image_gray.size(), INTER_LINEAR);
-  
+
+  //rectangle(binary_warped, Point(0,binary_warped.rows), Point(300,0), Scalar(0,0,0),FILLED);
+  //rectangle(binary_warped, Point(binary_warped.cols - 350, binary_warped.rows), Point(binary_warped.cols,0), Scalar(0,0,0), FILLED);
+  /*imshow("test", binary_warped);
+  waitKey(0);*/
+
   return;
 }
 
@@ -220,7 +224,7 @@ void LaneDetection::non_sliding_window(const Mat& binary_warped, Mat& left_fit, 
 
   calculate_lane_fit_next_frame(non_zero, left_fit, left_xs, left_ys, margin);
   calculate_lane_fit_next_frame(non_zero, right_fit, right_xs, right_ys, margin);
-
+  
   new_left_fit = left_fit;
   new_right_fit = right_fit;
 
@@ -230,7 +234,6 @@ void LaneDetection::non_sliding_window(const Mat& binary_warped, Mat& left_fit, 
     Mat xs(left_xs, CV_32FC1);
     Mat ys(left_ys, CV_32FC1);
     polyfit(ys, xs, new_left_fit, 2);
-
   }  
 
   if(!right_fit.empty())
@@ -239,7 +242,6 @@ void LaneDetection::non_sliding_window(const Mat& binary_warped, Mat& left_fit, 
     Mat xs(right_xs, CV_32FC1);
     Mat ys(right_ys, CV_32FC1);
     polyfit(ys, xs, new_right_fit, 2);
-    
   } 
 
   return;
@@ -558,7 +560,7 @@ bool LaneDetection::frame_processing()
   Mat color_filtered_image, filtered_image_gray;
   Mat binary_warped;
   Mat histogram;
-  Point left_peak, right_peak;
+  Point left_peak(0,0), right_peak(0,0);
   Mat new_left_fit, new_right_fit;
   Mat sliding_window_output;
   vector<float> plot_y, left_fit_x, right_fit_x;
@@ -577,14 +579,6 @@ bool LaneDetection::frame_processing()
   undistorted_frame = calibrator.undistort_image(frame);
   frame = undistorted_frame;
 
-  if(wait_to_rearrange > 0 && wait_to_rearrange < 205)
-  {
-    first_frame = true;
-    wait_to_rearrange++;
-    video_output.write(frame);
-    return capture.read(frame);
-  }
-
   color_filter(color_filtered_image);
   cvtColor(color_filtered_image, filtered_image_gray, COLOR_RGB2GRAY);
 
@@ -598,6 +592,18 @@ bool LaneDetection::frame_processing()
 
   calculate_lane_histogram(histogram, left_peak, right_peak);
 
+  if(wait_to_rearrange == 1){
+    if(left_peak.x > (binary_warped.cols / 2) - 100 || left_peak.x < 300 || right_peak.x < (binary_warped.cols / 2) + 100 || right_peak.x > binary_warped.cols - 300)
+    {
+      video_output.write(undistorted_frame);
+      return capture.read(frame);
+    } else {
+      first_frame = true;
+      wait_to_rearrange = 0;
+    }
+
+  }
+  
   if(first_frame ==  true)
   {
     sliding_window(binary_warped, left_peak, right_peak, sliding_window_output, left_boxes, right_boxes);
@@ -618,10 +624,10 @@ bool LaneDetection::frame_processing()
 
     prev_frame = sliding_window_output;
 
-  } else 
-  {
+  } else {
+    
     non_sliding_window(binary_warped, left_fit_lane, right_fit_lane, new_left_fit, new_right_fit, margin);
-
+    
     plot_y = linspace(0.0, (float)binary_warped.rows - 1, binary_warped.rows);
 
     poly_fit_x(plot_y, left_fit_x, new_left_fit);
@@ -638,7 +644,8 @@ bool LaneDetection::frame_processing()
 
     prev_frame = binary_warped;
 
-  }
+    }
+
 
   get_inverse_points(plot_y, left_fit_x, right_fit_x, color_warp);
 
@@ -679,7 +686,7 @@ bool LaneDetection::frame_processing()
 
   if(car_offset >= 1)
   {
-    wait_to_rearrange++;
+    wait_to_rearrange = 1;
   }
 
   return capture.read(frame);
