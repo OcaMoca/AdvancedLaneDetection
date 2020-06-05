@@ -25,7 +25,10 @@ class LaneDetection
 
         Mat frame;
         Mat prev_frame;
+        Mat steering_wheel;
         bool first_frame;
+        float smoothed_angle;
+        
 
         Mat left_fit_lane, right_fit_lane;
 
@@ -64,6 +67,7 @@ class LaneDetection
         float trim_mean(vector<float>& , float);
         void convert_to_optical(const Mat&, Mat&);
         float calculate_car_offset(Mat&, Mat&, Mat&);
+        Mat steering_wheel_rotation(float);
 
     public:
 

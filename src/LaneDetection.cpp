@@ -2,19 +2,20 @@
 
 LaneDetection::LaneDetection()
 {
-  /*trap_bottom_width = 0.7f; 
+  trap_bottom_width = 0.7f; 
   trap_top_width = 0.1f; 
   trap_height = 0.38f;
-  car_hood = 50;*/
+  car_hood = 50;
 
-  trap_bottom_width = 0.28f; 
+  /*trap_bottom_width = 0.28f; 
 	trap_top_width = 0.05f; 
 	trap_height = 0.3f;
-	car_hood = 150;
+	car_hood = 150;*/
 
   first_frame = true;
   result_optical = 0.0;
   wait_to_rearrange = 0;
+  smoothed_angle = 0;
 
 }
 
@@ -26,8 +27,8 @@ void LaneDetection::color_filter(Mat& filtered_image)
     Mat white_image;
     Mat yellow_image;
 
-    //cv::inRange(frame, Scalar(190,190,190), Scalar(255,255,255), mask1);
-    cv::inRange(frame, Scalar(80,80,80), Scalar(255,255,255), mask1);
+    cv::inRange(frame, Scalar(190,190,190), Scalar(255,255,255), mask1);
+    //cv::inRange(frame, Scalar(80,80,80), Scalar(255,255,255), mask1);
 
     cvtColor(frame, image_hsv, COLOR_RGB2HSV);
     cv::inRange(image_hsv, Scalar(90,70,100), Scalar(110,255,255), mask2);
@@ -94,11 +95,6 @@ void LaneDetection::perspective_transform(const Mat& filtered_image_gray, Mat& b
   threshold(filtered_image_gray, binary_threshold, 0, 255, THRESH_BINARY);
 
   warpPerspective(binary_threshold, binary_warped, M, filtered_image_gray.size(), INTER_LINEAR);
-
-  //rectangle(binary_warped, Point(0,binary_warped.rows), Point(300,0), Scalar(0,0,0),FILLED);
-  //rectangle(binary_warped, Point(binary_warped.cols - 350, binary_warped.rows), Point(binary_warped.cols,0), Scalar(0,0,0), FILLED);
-  /*imshow("test", binary_warped);
-  waitKey(0);*/
 
   return;
 }
@@ -387,7 +383,7 @@ float LaneDetection::calculate_curvature(const Mat& lane_fit, int height)
   R_curve = pow((1 + pow(derivate_1, 2)), 1.5) / derivate_2; //R_curve = (1 + (2Ay + B)^2)^3/2 / 2A
 
   if(R_curve > 1000 || R_curve < -1000)
-    R_curve = pow((1 + pow(derivate_1, 2)), 1.5) / abs(derivate_2); //R_curve = (1 + (2Ay + B)^2)^3/2 / |2A|
+    R_curve = pow((1 + pow(derivate_1, 2)), 1.5) / abs(derivate_2); //R_curve = (1 + (2Ay + B)^2)^3/2 / |2A|*/
 
   return R_curve;
 
@@ -534,6 +530,8 @@ void LaneDetection::init(string file_name, string output_file)
   success = calibrator.add_chessboard_points(chessboard_images, board_size);
   error = calibrator.calibration(image_size);
 
+  steering_wheel = imread("/home/Olivera/LaneDetectionBCs/test_images/steering_wheel_new.png");
+
   if(capture.read(frame))
     trapezoid_roi();
 
@@ -552,6 +550,21 @@ float LaneDetection::calculate_car_offset(Mat& undistorted, Mat& left_fit, Mat& 
   car_offset = car_offset * xm_per_pix;
 
   return car_offset;
+
+}
+
+Mat LaneDetection::steering_wheel_rotation(float R_curve_avg)
+{
+  float degree_of_curve;
+  Mat M;
+  Mat steering_wheel_rotated;
+
+  degree_of_curve = -5729.57795 / R_curve_avg;
+  smoothed_angle = smoothed_angle + 0.2 * pow(abs(degree_of_curve - smoothed_angle), 2.0/3.0) * (degree_of_curve - smoothed_angle) / abs(degree_of_curve - smoothed_angle);
+  M = getRotationMatrix2D(Point2f(steering_wheel.cols / 2.0, steering_wheel.rows / 2.0), smoothed_angle , 1);
+  warpAffine(steering_wheel, steering_wheel_rotated, M, Size(steering_wheel.cols, steering_wheel.rows));
+
+  return steering_wheel_rotated;
 
 }
 
@@ -575,6 +588,8 @@ bool LaneDetection::frame_processing()
   float R_curve_left, R_curve_right, R_curve_avg;
   Mat optical_out;
   int speed;
+  Mat steering_wheel_rotated; 
+  Mat result;
 
   undistorted_frame = calibrator.undistort_image(frame);
   frame = undistorted_frame;
@@ -592,7 +607,7 @@ bool LaneDetection::frame_processing()
 
   calculate_lane_histogram(histogram, left_peak, right_peak);
 
-  if(wait_to_rearrange == 1){
+  /*if(wait_to_rearrange == 1){
     if(left_peak.x > (binary_warped.cols / 2) - 100 || left_peak.x < 300 || right_peak.x < (binary_warped.cols / 2) + 100 || right_peak.x > binary_warped.cols - 300)
     {
       video_output.write(undistorted_frame);
@@ -602,7 +617,7 @@ bool LaneDetection::frame_processing()
       wait_to_rearrange = 0;
     }
 
-  }
+  }*/
   
   if(first_frame ==  true)
   {
@@ -664,6 +679,8 @@ bool LaneDetection::frame_processing()
   float car_offset;
   car_offset = calculate_car_offset(undistorted_frame, left_fit_lane, right_fit_lane);
 
+  steering_wheel_rotated = steering_wheel_rotation(R_curve_avg);
+
   char radius_text[100];
   char speed_text[100];
   char car_offset_text[100];
@@ -681,13 +698,16 @@ bool LaneDetection::frame_processing()
   }
 
   cv::putText(output_frame, car_offset_text, Point2f(50,150), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,0,0));
-  
+
+  Rect roi(Point(output_frame.cols - steering_wheel_rotated.cols ,output_frame.rows - steering_wheel_rotated.rows), Size(steering_wheel_rotated.cols, steering_wheel_rotated.rows));
+  steering_wheel_rotated.copyTo(output_frame(roi));
+
   video_output.write(output_frame);
 
-  if(car_offset >= 1)
+  /*if(car_offset >= 1)
   {
     wait_to_rearrange = 1;
-  }
+  }*/
 
   return capture.read(frame);
 }
