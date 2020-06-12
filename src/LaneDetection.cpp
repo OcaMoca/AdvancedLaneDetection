@@ -500,43 +500,6 @@ void LaneDetection::convert_to_optical(const Mat& curr_frame, Mat& convert_to_op
   return;
 }
 
-void LaneDetection::init(string file_name, string output_file)
-{
-  capture.open(file_name);
-
-  int frame_width = (int)capture.get(CAP_PROP_FRAME_WIDTH);
-  int frame_height = (int)capture.get(CAP_PROP_FRAME_HEIGHT);
-  
-  video_output.open(output_file, VideoWriter::fourcc('A','V','C','1'), 25.0, Size(frame_width,frame_height),true);
-  
-  if(!capture.isOpened() )
-      throw "Error when reading steam_mp4";
-
-  if (!video_output.isOpened())
-  {
-      cout << "!!! Output video could not be opened" << endl;
-      return;
-  }
-
-  vector<string> chessboard_images;
-  cv::glob("/home/Olivera/LaneDetectionBCs/camera_cal/*.jpg", chessboard_images);
-
-  bool success;
-  int error;
-  cv::Size board_size(8,6);
-  Mat img = imread(chessboard_images[0]);
-  cv::Size image_size(1280,720);
-
-  success = calibrator.add_chessboard_points(chessboard_images, board_size);
-  error = calibrator.calibration(image_size);
-
-  steering_wheel = imread("/home/Olivera/LaneDetectionBCs/test_images/steering_wheel_new.png");
-
-  if(capture.read(frame))
-    trapezoid_roi();
-
-  return;
-}
 
 float LaneDetection::calculate_car_offset(Mat& undistorted, Mat& left_fit, Mat& right_fit)
 {
@@ -567,6 +530,45 @@ Mat LaneDetection::steering_wheel_rotation(float R_curve_avg)
   return steering_wheel_rotated;
 
 }
+
+void LaneDetection::init(string file_name, string output_file)
+{
+  capture.open(file_name);
+
+  int frame_width = (int)capture.get(CAP_PROP_FRAME_WIDTH);
+  int frame_height = (int)capture.get(CAP_PROP_FRAME_HEIGHT);
+  
+  video_output.open(output_file, VideoWriter::fourcc('A','V','C','1'), 25.0, Size(frame_width,frame_height),true);
+  
+  if(!capture.isOpened() )
+      throw "Error when reading steam_mp4";
+
+  if (!video_output.isOpened())
+  {
+      cout << "!!! Output video could not be opened" << endl;
+      return;
+  }
+
+  vector<string> chessboard_images;
+  cv::glob("/home/Olivera/LaneDetectionBCs/camera_cal/*.jpg", chessboard_images);
+
+  bool success;
+  int error;
+  cv::Size board_size(8,6);
+  Mat img = imread(chessboard_images[0]);
+  cv::Size image_size(1280,720);
+
+  success = calibrator.add_chessboard_points(chessboard_images, board_size);
+  error = calibrator.calibration(image_size);
+
+  steering_wheel = imread("/home/Olivera/LaneDetectionBCs/test_images/steering_wheel_new.png", IMREAD_UNCHANGED);
+
+  if(capture.read(frame))
+    trapezoid_roi();
+
+  return;
+}
+
 
 bool LaneDetection::frame_processing()
 {
@@ -700,6 +702,7 @@ bool LaneDetection::frame_processing()
   cv::putText(output_frame, car_offset_text, Point2f(50,150), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,0,0));
 
   Rect roi(Point(output_frame.cols - steering_wheel_rotated.cols ,output_frame.rows - steering_wheel_rotated.rows), Size(steering_wheel_rotated.cols, steering_wheel_rotated.rows));
+  cvtColor(steering_wheel_rotated, steering_wheel_rotated, COLOR_BGRA2BGR);
   steering_wheel_rotated.copyTo(output_frame(roi));
 
   video_output.write(output_frame);
