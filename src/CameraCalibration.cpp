@@ -47,11 +47,19 @@ double CameraCalibration::calibration(cv::Size& image_size)
     return ret;
 }
 
-Mat CameraCalibration::undistort_image(const Mat& image)
+void CameraCalibration::undistort_image(const Mat& image, Mat& undistorted)
 {
-    Mat undistorted;
-
     undistort(image, undistorted, camera_matrix, dist_coefs);
+    return;
+}
 
-    return undistorted;
+void CameraCalibration::get_camera_matrix(Mat& camera_matrix)
+{
+    camera_matrix = this->camera_matrix;
+    return;
+}
+void CameraCalibration::get_dist_coefs(Mat& dist_coefs)
+{
+    dist_coefs = this->dist_coefs;
+    return;
 }

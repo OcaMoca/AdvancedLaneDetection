@@ -1,4 +1,6 @@
 #include "../include/LaneDetection.hpp"
+using namespace std::chrono;
+
 
 LaneDetection::LaneDetection()
 {
@@ -19,7 +21,7 @@ LaneDetection::LaneDetection()
 
 }
 
-void LaneDetection::color_filter(Mat& filtered_image)
+void LaneDetection::color_filter(Mat& frame, Mat& filtered_image)
 {
     Mat mask1;
     Mat mask2;
@@ -42,7 +44,7 @@ void LaneDetection::color_filter(Mat& filtered_image)
     return;
 }
 
- void LaneDetection::calculate_sobel(Mat& sobel_output)
+ void LaneDetection::calculate_sobel(Mat& frame,Mat& sobel_output)
  {
    int dx, dy;
    int depth = CV_16S;
@@ -66,7 +68,7 @@ void LaneDetection::color_filter(Mat& filtered_image)
    return;
  }
 
-void LaneDetection::trapezoid_roi()
+void LaneDetection::trapezoid_roi(const Mat& frame)
 {
     int width = (int)frame.size().width;
     int height = (int)frame.size().height;
@@ -188,12 +190,13 @@ Mat LaneDetection::polyfit_windows(const vector<Window>& windows)
 	return fit;
 }
 
-void LaneDetection::calculate_lane_fit_next_frame(vector<Point2f> non_zero, Mat& lane_fit, vector<float>& xs, vector<float>& ys, int margin) 
+void LaneDetection::calculate_lane_fit_next_frame(const vector<Point2f>& non_zero, Mat& lane_fit, vector<float>& xs, vector<float>& ys, int margin) 
 {
   float x, y, left_x, right_x;
-
+  
   for(auto const& pt: non_zero)
   {
+    
     x = pt.x;
     y = pt.y;
 
@@ -220,7 +223,7 @@ void LaneDetection::non_sliding_window(const Mat& binary_warped, Mat& left_fit, 
 
   calculate_lane_fit_next_frame(non_zero, left_fit, left_xs, left_ys, margin);
   calculate_lane_fit_next_frame(non_zero, right_fit, right_xs, right_ys, margin);
-  
+
   new_left_fit = left_fit;
   new_right_fit = right_fit;
 
@@ -444,7 +447,6 @@ void LaneDetection::convert_to_optical(const Mat& curr_frame, Mat& convert_to_op
     }
 
   cvtColor(prev_frame, prev_frame_gray, COLOR_BGR2GRAY);
-
   cvtColor(curr_frame, curr_frame_gray, COLOR_BGR2GRAY);
 
   goodFeaturesToTrack(prev_frame_gray, old_point_vector, 300, 0.3, 7, Mat(), 7, false, 0.04);
@@ -516,61 +518,42 @@ float LaneDetection::calculate_car_offset(Mat& undistorted, Mat& left_fit, Mat& 
 
 }
 
-Mat LaneDetection::steering_wheel_rotation(float R_curve_avg)
+void LaneDetection::steering_wheel_rotation(float R_curve_avg, Mat& steering_wheel_rotated)
 {
   float degree_of_curve;
   Mat M;
-  Mat steering_wheel_rotated;
 
   degree_of_curve = -5729.57795 / R_curve_avg;
   smoothed_angle = smoothed_angle + 0.2 * pow(abs(degree_of_curve - smoothed_angle), 2.0/3.0) * (degree_of_curve - smoothed_angle) / abs(degree_of_curve - smoothed_angle);
   M = getRotationMatrix2D(Point2f(steering_wheel.cols / 2.0, steering_wheel.rows / 2.0), smoothed_angle , 1);
   warpAffine(steering_wheel, steering_wheel_rotated, M, Size(steering_wheel.cols, steering_wheel.rows));
 
-  return steering_wheel_rotated;
+  return;
 
 }
 
-void LaneDetection::init(string file_name, string output_file)
+void LaneDetection::init()
 {
-  capture.open(file_name);
-
-  int frame_width = (int)capture.get(CAP_PROP_FRAME_WIDTH);
-  int frame_height = (int)capture.get(CAP_PROP_FRAME_HEIGHT);
-  
-  video_output.open(output_file, VideoWriter::fourcc('A','V','C','1'), 25.0, Size(frame_width,frame_height),true);
-  
-  if(!capture.isOpened() )
-      throw "Error when reading steam_mp4";
-
-  if (!video_output.isOpened())
-  {
-      cout << "!!! Output video could not be opened" << endl;
-      return;
-  }
-
   vector<string> chessboard_images;
-  cv::glob("/home/Olivera/LaneDetectionBCs/camera_cal/*.jpg", chessboard_images);
+  cv::glob("/home/Olivera/LaneDetectionBSc/camera_cal/*.jpg", chessboard_images);
 
   bool success;
   int error;
   cv::Size board_size(8,6);
   Mat img = imread(chessboard_images[0]);
   cv::Size image_size(1280,720);
+   
 
   success = calibrator.add_chessboard_points(chessboard_images, board_size);
   error = calibrator.calibration(image_size);
 
-  steering_wheel = imread("/home/Olivera/LaneDetectionBCs/test_images/steering_wheel_new.png", IMREAD_UNCHANGED);
-
-  if(capture.read(frame))
-    trapezoid_roi();
+  steering_wheel = imread("/home/Olivera/LaneDetectionBSc/test_images/steering_wheel_new.png", IMREAD_UNCHANGED);
 
   return;
 }
 
 
-bool LaneDetection::frame_processing()
+void LaneDetection::frame_processing(Mat& frame, Mat& output_frame)
 {
   Mat color_filtered_image, filtered_image_gray;
   Mat binary_warped;
@@ -580,10 +563,10 @@ bool LaneDetection::frame_processing()
   Mat sliding_window_output;
   vector<float> plot_y, left_fit_x, right_fit_x;
   vector<Window> left_boxes, right_boxes;
-  Mat color_warp = Mat::zeros(frame.size(), CV_8UC3);
+  Mat color_warp = Mat::zeros(frame.size(), CV_8UC3);;
   Mat inverse_perspective_output;
   Mat Minv(2,4,CV_32FC2);
-  Mat output_frame;
+  //Mat output_frame;
   Mat undistorted_frame;
   int margin = 50;
   Mat sobel_output;
@@ -592,14 +575,13 @@ bool LaneDetection::frame_processing()
   int speed;
   Mat steering_wheel_rotated; 
   Mat result;
+  
+  calibrator.undistort_image(frame, undistorted_frame);
 
-  undistorted_frame = calibrator.undistort_image(frame);
-  frame = undistorted_frame;
-
-  color_filter(color_filtered_image);
+  color_filter(undistorted_frame, color_filtered_image);
   cvtColor(color_filtered_image, filtered_image_gray, COLOR_RGB2GRAY);
 
-  calculate_sobel(sobel_output);
+  calculate_sobel(undistorted_frame, sobel_output);
 
   bitwise_and(filtered_image_gray, sobel_output, filtered_image_gray);
 
@@ -609,6 +591,7 @@ bool LaneDetection::frame_processing()
 
   calculate_lane_histogram(histogram, left_peak, right_peak);
 
+  
   /*if(wait_to_rearrange == 1){
     if(left_peak.x > (binary_warped.cols / 2) - 100 || left_peak.x < 300 || right_peak.x < (binary_warped.cols / 2) + 100 || right_peak.x > binary_warped.cols - 300)
     {
@@ -624,6 +607,7 @@ bool LaneDetection::frame_processing()
   if(first_frame ==  true)
   {
     sliding_window(binary_warped, left_peak, right_peak, sliding_window_output, left_boxes, right_boxes);
+    
     left_fit_lane = polyfit_windows(left_boxes);
     right_fit_lane = polyfit_windows(right_boxes);
 
@@ -632,17 +616,15 @@ bool LaneDetection::frame_processing()
     poly_fit_x(plot_y, left_fit_x, left_fit_lane);
     poly_fit_x(plot_y, right_fit_x, right_fit_lane);
 
-    R_curve_left = calculate_curvature(left_fit_lane, frame.rows);
-    R_curve_right = calculate_curvature(right_fit_lane, frame.rows);
+    R_curve_left = calculate_curvature(left_fit_lane, undistorted_frame.rows);
+    R_curve_right = calculate_curvature(right_fit_lane, undistorted_frame.rows);
 
     R_curve_avg = (R_curve_left + R_curve_right) / 2;
 
-    first_frame  = false;
-
     prev_frame = sliding_window_output;
+   
 
   } else {
-    
     non_sliding_window(binary_warped, left_fit_lane, right_fit_lane, new_left_fit, new_right_fit, margin);
     
     plot_y = linspace(0.0, (float)binary_warped.rows - 1, binary_warped.rows);
@@ -650,8 +632,8 @@ bool LaneDetection::frame_processing()
     poly_fit_x(plot_y, left_fit_x, new_left_fit);
     poly_fit_x(plot_y, right_fit_x, new_right_fit);
 
-    R_curve_left = calculate_curvature(new_left_fit, frame.rows);
-    R_curve_right = calculate_curvature(new_right_fit, frame.rows);
+    R_curve_left = calculate_curvature(new_left_fit, undistorted_frame.rows);
+    R_curve_right = calculate_curvature(new_right_fit, undistorted_frame.rows);
 
     R_curve_avg = (R_curve_left + R_curve_right) / 2;
 
@@ -661,27 +643,28 @@ bool LaneDetection::frame_processing()
 
     prev_frame = binary_warped;
 
-    }
+    
 
+  }
 
   get_inverse_points(plot_y, left_fit_x, right_fit_x, color_warp);
 
   if(first_frame == true)
   {
     original_perspective(sliding_window_output, Minv, inverse_perspective_output);
+    first_frame  = false;
 
   } else
   {
     original_perspective(binary_warped, Minv, inverse_perspective_output);
   }
 
-
-  final_perspective(color_warp, frame, Minv, output_frame);
+  final_perspective(color_warp, undistorted_frame, Minv, output_frame);
 
   float car_offset;
   car_offset = calculate_car_offset(undistorted_frame, left_fit_lane, right_fit_lane);
 
-  steering_wheel_rotated = steering_wheel_rotation(R_curve_avg);
+   steering_wheel_rotation(R_curve_avg, steering_wheel_rotated);
 
   char radius_text[100];
   char speed_text[100];
@@ -701,26 +684,18 @@ bool LaneDetection::frame_processing()
 
   cv::putText(output_frame, car_offset_text, Point2f(50,150), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,0,0));
 
-  Rect roi(Point(output_frame.cols - steering_wheel_rotated.cols ,output_frame.rows - steering_wheel_rotated.rows), Size(steering_wheel_rotated.cols, steering_wheel_rotated.rows));
+  Rect roi(Point(output_frame.cols - steering_wheel_rotated.cols, output_frame.rows - steering_wheel_rotated.rows), Size(steering_wheel_rotated.cols, steering_wheel_rotated.rows));
   cvtColor(steering_wheel_rotated, steering_wheel_rotated, COLOR_BGRA2BGR);
   steering_wheel_rotated.copyTo(output_frame(roi));
 
-  video_output.write(output_frame);
+  //video_output.write(output_frame);
 
   /*if(car_offset >= 1)
   {
     wait_to_rearrange = 1;
   }*/
 
-  return capture.read(frame);
-}
-
-void LaneDetection::release()
-{
-
-  cout << "SAVED." << endl;
-  capture.release();
-	video_output.release();
+  //return capture.read(frame);
 
   return;
 }

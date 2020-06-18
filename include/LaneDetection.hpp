@@ -1,15 +1,14 @@
 #ifndef __LANEDETECTION_H__
 #define __LANEDETECTION_H__
 
-#include <thread>
+
 #include <experimental/filesystem>
 #include <iostream>
 #include <algorithm> 
 #include <opencv2/videoio.hpp>
 #include <functional> 
 #include <cmath>
-
-
+#include <thread>
 #include "../include/Window.hpp"
 #include "../include/CameraCalibration.hpp"
 
@@ -18,17 +17,13 @@ class LaneDetection
 {
     private:
 
-        VideoCapture capture;
-        VideoWriter video_output;
-
         CameraCalibration calibrator;
 
-        Mat frame;
+        //Mat frame;
         Mat prev_frame;
         Mat steering_wheel;
         bool first_frame;
         float smoothed_angle;
-        
 
         Mat left_fit_lane, right_fit_lane;
 
@@ -51,14 +46,13 @@ class LaneDetection
         Mat polyfit_windows(const vector<Window>&);
         void poly_fit_x(const vector<float>&, vector<float>&, const Mat&);
 
-        void trapezoid_roi();
-        void color_filter(Mat&);
-        void calculate_sobel(Mat&);
+        void color_filter(Mat&,Mat&);
+        void calculate_sobel(Mat&, Mat&);
         void perspective_transform(const Mat&, Mat&);
         void get_histogram(const Mat&, Mat&);
         void calculate_lane_histogram(const Mat&, Point&, Point&);
         void sliding_window(Mat&, const Point&, const Point&, Mat&, vector<Window>&, vector<Window>&);
-        void calculate_lane_fit_next_frame(vector<Point2f>, Mat&, vector<float>&, vector<float>&, int); 
+        void calculate_lane_fit_next_frame(const vector<Point2f>&, Mat&, vector<float>&, vector<float>&, int); 
         void non_sliding_window(const Mat&, Mat&, Mat&, Mat&,  Mat&, int);
         void get_inverse_points(const vector<float>&, const vector<float>&, const vector<float>&, Mat&);
         void original_perspective(const Mat&, Mat&, Mat&);
@@ -67,15 +61,16 @@ class LaneDetection
         float trim_mean(vector<float>& , float);
         void convert_to_optical(const Mat&, Mat&);
         float calculate_car_offset(Mat&, Mat&, Mat&);
-        Mat steering_wheel_rotation(float);
+        void steering_wheel_rotation(float, Mat&);
 
     public:
 
         LaneDetection();
     
-        void init(string file_name, string output_file);
-        bool frame_processing();
-        void release();
+        void init();
+        void trapezoid_roi(const Mat&);
+        void frame_processing(Mat&, Mat&);
+        //void release();
 
 };
 
