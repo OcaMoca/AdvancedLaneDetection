@@ -1,12 +1,9 @@
 #include "LoadFrame.hpp"
 
-LoadFrame::LoadFrame()
+LoadFrame::LoadFrame(string& input_file_s, string& output_file_s)
 {
-    ifstream config_file("configuration.json");
-    j = nlohmann::json::parse(config_file);
-
-    input_file = j.at("input_file").at("name_1");
-    output_file = j.at("output_file").at("name_1");
+    input_file = input_file_s;
+    output_file = output_file_s;
 }
 
 void LoadFrame::open_input_video()

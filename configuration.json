@@ -5,8 +5,8 @@
     },
 
     "output_file" : {
-        "name_1" : "/home/Olivera/LaneDetectionBSc/test_videos_output/probaaa.mp4",
-        "name_2" : "/home/Olivera/LaneDetectionBSc/test_videos/proba2.mp4" 
+        "name_1" : "/home/Olivera/LaneDetectionBSc/test_videos_output/aaa.mp4",
+        "name_2" : "/home/Olivera/LaneDetectionBSc/test_videos_output/prestrojavanje_out_proba.mp4" 
     },
 
     "calibration_images" : {

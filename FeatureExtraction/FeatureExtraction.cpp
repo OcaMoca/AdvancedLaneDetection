@@ -311,10 +311,8 @@ void FeatureExtraction::convert_to_optical(const Mat& curr_frame, Mat& prev_fram
         colors.push_back(Scalar(r,g,b));
     }
 
-  //cvtColor(prev_frame, prev_frame_gray, COLOR_BGR2GRAY);
-  //cvtColor(curr_frame, curr_frame_gray, COLOR_BGR2GRAY);
-  prev_frame_gray = prev_frame;
-  curr_frame_gray = curr_frame; 
+  cvtColor(prev_frame, prev_frame_gray, COLOR_BGR2GRAY);
+  cvtColor(curr_frame, curr_frame_gray, COLOR_BGR2GRAY);
 
   goodFeaturesToTrack(prev_frame_gray, old_point_vector, 300, 0.3, 7, Mat(), 7, false, 0.04);
 
@@ -324,7 +322,7 @@ void FeatureExtraction::convert_to_optical(const Mat& curr_frame, Mat& prev_fram
 
   calcOpticalFlowPyrLK(prev_frame_gray, curr_frame_gray, old_point_vector, new_point_vector, status, error, Size(15, 15), 2, criteria);
 
-  for(int i = 0; i < (int)old_point_vector.size(); i++)
+  for(int i = 0; i < old_point_vector.size(); i++)
   {
     if(status[i] == 1)
     {
@@ -362,8 +360,9 @@ void FeatureExtraction::convert_to_optical(const Mat& curr_frame, Mat& prev_fram
     car_speed = (int)trim_mean(succ_avg_speed, 0.2);
     succ_avg_speed.erase(succ_avg_speed.begin());
   } 
-
+ 
   add(curr_frame, mask, convert_to_optical_output);
+  
   old_point_vector = good_new;
 
   return;
@@ -376,7 +375,7 @@ void FeatureExtraction::calculate_car_offset(Mat& undistorted, Mat& left_fit, Ma
   float bottom_x_left = left_fit.at<float>(2, 0) * bottom_y * bottom_y + left_fit.at<float>(1, 0) * bottom_y + left_fit.at<float>(0, 0);
   float bottom_x_right = right_fit.at<float>(2, 0) * bottom_y * bottom_y + right_fit.at<float>(1, 0) * bottom_y + right_fit.at<float>(0, 0);
 
-  float car_offset = undistorted.cols / 2 - 100 - (bottom_x_left + bottom_x_right) / 2;
+  car_offset = undistorted.cols / 2 - 100 - (bottom_x_left + bottom_x_right) / 2;
 
   float xm_per_pix = 3.7 / 700;
   car_offset = car_offset * xm_per_pix;
@@ -394,4 +393,15 @@ void FeatureExtraction::steering_wheel_rotation(Mat& steering_wheel, float R_cur
   warpAffine(steering_wheel, steering_wheel_rotated, M, Size(steering_wheel.cols, steering_wheel.rows));
 
   return;
+}
+
+
+float FeatureExtraction::get_car_offset()
+{
+  return car_offset;
+}
+
+float FeatureExtraction::get_car_speed()
+{
+  return car_speed;
 }

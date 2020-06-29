@@ -40,8 +40,8 @@ class FeatureExtraction
         void calculate_car_offset(Mat&, Mat&, Mat&);
         void steering_wheel_rotation(Mat&, float, float&, Mat&);
         
-        float get_car_offset() {return car_offset;}
-        float get_car_speed() {return car_speed;}
+        float get_car_offset(); 
+        float get_car_speed();
         
 
 };

@@ -28,7 +28,7 @@ class LoadFrame
 
     public:
 
-        LoadFrame();
+        LoadFrame(string&, String&);
         void open_input_video();
         bool read_frame();
         void get_frame(Mat&);
