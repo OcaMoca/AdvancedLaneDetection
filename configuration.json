@@ -1,0 +1,45 @@
+{
+    "input_file" : {
+        "name_1" : "/home/Olivera/LaneDetectionBSc/test_videos/project_video.mp4", 
+        "name_2" : "/home/Olivera/LaneDetectionBSc/test_videos/prestrojavanje.mp4"
+    },
+
+    "output_file" : {
+        "name_1" : "/home/Olivera/LaneDetectionBSc/test_videos_output/probaaa.mp4",
+        "name_2" : "/home/Olivera/LaneDetectionBSc/test_videos/proba2.mp4" 
+    },
+
+    "calibration_images" : {
+        "name": "/home/Olivera/LaneDetectionBSc/camera_cal/*.jpg"
+    },
+
+    "steering_wheel" : {
+        "name" : "/home/Olivera/LaneDetectionBSc/test_images/steering_wheel.png"
+    },
+
+    "trap_bottom_width" : {
+        "value_1" : "0.7",
+        "value_2" : "0.28f"
+    },
+
+    "trap_top_width" : {
+        "value_1" : "0.1f",
+        "value_2" : "0.05f"
+    },
+
+    "trap_height" : {
+        "value_1" : "0.38f",
+        "value_2" : "0.3f"
+    },
+
+    "car_hood" : {
+        "value_1" : "50.0",
+        "value_2" : "150.0"
+    },
+
+    "white_range" : {
+        "value_1" : "190",
+        "value_2" : "80"
+    }
+
+}

@@ -4,10 +4,13 @@ C_FLAGS = -g -Wall
 BIN		= bin
 SRCS	= src/*.cpp
 PROG = bin/main
-SRC = src
-INCLUDE	:= include
-LIB		:= lib
 
+SOURCES := $(shell find . -name '*.cpp')
+
+HEADERS := $(shell find . -name '*.hpp')
+
+
+LIB := lib
 
 OPENCV = `pkg-config opencv4 --cflags --libs`
 LIBS = $(OPENCV)
@@ -26,5 +29,9 @@ clean:
 run: all
 	./$(BIN)/$(EXECUTABLE)
 
-$(BIN)/$(EXECUTABLE): $(SRC)/*.cpp
-	$(CC) $(C_FLAGS) -I$(INCLUDE) -L$(LIB) $^ -o $@ $(LIBS)
+$(BIN)/$(EXECUTABLE): $(SOURCES) $(HEADERS)	
+	$(CC) $(C_FLAGS) -o ./$(BIN)/$(EXECUTABLE) $(SOURCES) $(LIBS)
+
+
+
+
