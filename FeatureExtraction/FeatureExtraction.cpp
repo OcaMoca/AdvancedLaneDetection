@@ -276,7 +276,6 @@ float FeatureExtraction::trim_mean(vector<float>& array, float pertentage)
 
 }
 
-
 void FeatureExtraction::convert_to_optical(const Mat& curr_frame, Mat& prev_frame, Mat& convert_to_optical_output)
 {
   Mat prev_frame_gray, curr_frame_gray;
@@ -378,7 +377,7 @@ void FeatureExtraction::calculate_car_offset(Mat& undistorted, Mat& left_fit, Ma
   car_offset = undistorted.cols / 2 - 100 - (bottom_x_left + bottom_x_right) / 2;
 
   float xm_per_pix = 3.7 / 700;
-  car_offset = car_offset * xm_per_pix;
+  car_offset = abs(car_offset) * xm_per_pix;
 
 }
 

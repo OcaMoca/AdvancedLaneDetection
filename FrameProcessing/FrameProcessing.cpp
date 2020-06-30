@@ -65,10 +65,11 @@ void FrameProcessing::color_filter(Mat& frame, Mat& filtered_image, string& whit
    Sobel(gray, grad_x, depth, 1, 0, 3, scale, delta, BORDER_DEFAULT);
    convertScaleAbs(grad_x, abs_grad_x);
 
-   Sobel(gray, grad_y, depth, 0, 1, 3, scale, delta, BORDER_DEFAULT);
-   convertScaleAbs(grad_y, abs_grad_y);
+   //Sobel(gray, grad_y, depth, 0, 1, 3, scale, delta, BORDER_DEFAULT);
+   //convertScaleAbs(grad_y, abs_grad_y);
 
-   addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0 , sobel_output);
+   //addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0 , sobel_output);
+   sobel_output = abs_grad_x;
 
    return;
  }

@@ -3,24 +3,45 @@
 #include "FrameProcessing/FrameProcessing.hpp"
 #include "FeatureExtraction/FeatureExtraction.hpp"
 #include "HMI/HMI.hpp"
+#include "TestModule/TestModule.hpp"
 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
-int wait_to_rearrange = 0;
+ofstream test_file("/home/Olivera/LaneDetectionBSc/testing.txt");
+vector<Point2i> test_points;
+char test_text_x[50], test_text_y[50]; 
+
+void CallBackFunc(int event, int x, int y, int flags, void* usrdata)
+{   
+    if  ( event == EVENT_LBUTTONDOWN )
+    {
+        sprintf(test_text_x, "Position ( %d,", x);
+        sprintf(test_text_y, "%d )", y);
+        strcat(test_text_x, test_text_y);
+        test_file << strcat(test_text_x, "\n");
+        cout << "Position (" << x << ", " << y << ")" << endl;
+
+        Point2i pt(x,y);
+        test_points.push_back(pt);
+    }
+    
+}
 
 int main()
 {
     json j; 
-    
-    int cnt = 0;
-    float smoothed_angle = 0.0;
+
     Mat frame;
     Mat output_frame;
     Mat prev_frame;
+    Mat test_frame;
+
+    float smoothed_angle = 0.0;
     bool first_frame = true;
     Mat steering_wheel;
     Mat left_fit_lane, right_fit_lane;
+    int wait_to_rearrange = 0;
     
     string input_file_s;
     string output_file_s;
@@ -28,26 +49,26 @@ int main()
     ifstream config_file("configuration.json");
     j = nlohmann::json::parse(config_file);
 
-    input_file_s = j.at("input_file").at("name_2");
-    output_file_s = j.at("output_file").at("name_2");
-    
+    input_file_s = j.at("input_file").at("name_1");
+    output_file_s = j.at("output_file").at("name_1");
+
     LoadFrame load_frame(input_file_s, output_file_s);
     CameraCalibration calibrator;
     FrameProcessing frame_processor;
     FeatureExtraction feature_extractor;
     HMI hmi;
+    TestModule test;
 
     string steering_wheel_image = j.at("steering_wheel").at("name");
     steering_wheel = imread(steering_wheel_image, IMREAD_UNCHANGED);
+    output_frame = Mat::zeros(frame.rows, frame.cols, CV_32FC2);
+    prev_frame = Mat::zeros(frame.rows, frame.cols, CV_32FC2);
 
     /*LOADING FIRST FRAME*/
 
     load_frame.open_input_video();
     load_frame.read_frame();
     load_frame.get_frame(frame);
-
-    output_frame = Mat::zeros(frame.rows, frame.cols, CV_32FC2);
-    prev_frame = Mat::zeros(frame.rows, frame.cols, CV_32FC2);
 
     /*CAMERA CALIBRATION*/
 
@@ -74,19 +95,37 @@ int main()
     Mat binary_warped;
     Mat histogram;
     Point left_peak(0,0), right_peak(0,0);
+    vector<float> plot_y;
     Mat sliding_window_output;
+    vector<Window> left_boxes, right_boxes;
     Mat optical_flow_output;
     Mat new_left_fit, new_right_fit;
     float R_curve_left, R_curve_right, R_curve_avg;
-    int car_speed = 0;
-    float car_offset = 0.0;
-    Mat steering_wheel_rotated = steering_wheel;
+    int car_speed;
+    float car_offset;
+    Mat steering_wheel_rotated;
 
-    string trap_bottom_width_s = j.at("trap_bottom_width").at("value_2");
-    string trap_top_width_s = j.at("trap_top_width").at("value_2");
-    string trap_height_s = j.at("trap_height").at("value_2");
-    string car_hood_s = j.at("car_hood").at("value_2");
-    string white_range_s = j.at("white_range").at("value_2");
+    /*variables init*/
+    undistorted_frame = Mat::zeros(frame.rows, frame.cols, CV_32FC2);
+    color_filtered_image = Mat::zeros(frame.rows, frame.cols, CV_32FC2);
+    filtered_image_gray = Mat::zeros(frame.rows, frame.cols, CV_32FC2);
+    sobel_output = Mat::zeros(frame.rows, frame.cols, CV_32FC2);
+    binary_warped = Mat::zeros(frame.rows, frame.cols, CV_32FC2);
+    histogram = Mat::zeros(1, frame.cols, CV_32FC2);
+    sliding_window_output = Mat::zeros(1, frame.cols, CV_32FC2);
+    optical_flow_output = Mat::zeros(1, frame.cols, CV_32FC2);
+    steering_wheel_rotated = steering_wheel;
+    car_speed = 0;
+    car_offset = 0.0;
+    R_curve_left = 0.0;
+    R_curve_right = 0.0;
+    R_curve_avg = 0.0;
+
+    string trap_bottom_width_s = j.at("trap_bottom_width").at("value_1");
+    string trap_top_width_s = j.at("trap_top_width").at("value_1");
+    string trap_height_s = j.at("trap_height").at("value_1");
+    string car_hood_s = j.at("car_hood").at("value_1");
+    string white_range_s = j.at("white_range").at("value_1");
 
     frame_processor.trapezoid_roi(frame, trap_bottom_width_s, trap_top_width_s, trap_height_s, car_hood_s);
 
@@ -96,10 +135,9 @@ int main()
     while(true)
     {
         Mat color_warp_output = Mat::zeros(frame.size(), CV_8UC3); 
-        vector<Window> left_boxes, right_boxes;
-        vector<float> plot_y, left_fit_x, right_fit_x;
+        vector<float> left_fit_x, right_fit_x;
+        vector<Point2f> pts_left, pts_right;
         
-
         calibrator.undistort_image(frame, undistorted_frame);
 
         frame_processor.color_filter(undistorted_frame, color_filtered_image, white_range_s);
@@ -155,6 +193,15 @@ int main()
             prev_frame = binary_warped;
             first_frame = false;
 
+            /*TESTING*/
+
+            /*test_frame = binary_warped;
+            namedWindow("Test", 1);
+            setMouseCallback("Test", CallBackFunc, NULL);
+            imshow("Test", test_frame);
+            waitKey(0);
+            test_file.close();*/
+
         } else {
             feature_extractor.non_sliding_window(binary_warped, left_fit_lane, right_fit_lane, new_left_fit, new_right_fit, 50);
 
@@ -181,16 +228,21 @@ int main()
 
         /*HMI*/
 
-        hmi.get_inverse_points(plot_y, left_fit_x, right_fit_x, color_warp_output);
+        hmi.get_inverse_points(plot_y, left_fit_x, right_fit_x, color_warp_output, pts_left, pts_right);
 
         hmi.final_perspective(color_warp_output, undistorted_frame, original_roi, warped_roi, output_frame);
+
+        /*cout << "Left lane" << endl;
+        test.compare_parameters(pts_left, test_points);
+        cout << "Right lane" << endl;
+        test.compare_parameters(pts_right, test_points);*/
 
         hmi.show_values(R_curve_avg, car_offset, car_speed, output_frame);
         hmi.show_steering_wheel(output_frame, steering_wheel_rotated, 50);
 
         load_frame.write_to_output_video(output_frame);
 
-        if(car_offset >= 1.2)
+        if(car_offset >= 1.3)
         {
             wait_to_rearrange = 1;
         }
@@ -199,10 +251,6 @@ int main()
             load_frame.get_frame(frame);
         else
             break;
-
-        cnt++; 
-
-        cout << cnt << endl;
 
     }
 
