@@ -374,7 +374,7 @@ void FeatureExtraction::calculate_car_offset(Mat& undistorted, Mat& left_fit, Ma
   float bottom_x_left = left_fit.at<float>(2, 0) * bottom_y * bottom_y + left_fit.at<float>(1, 0) * bottom_y + left_fit.at<float>(0, 0);
   float bottom_x_right = right_fit.at<float>(2, 0) * bottom_y * bottom_y + right_fit.at<float>(1, 0) * bottom_y + right_fit.at<float>(0, 0);
 
-  car_offset = undistorted.cols / 2 - 100 - (bottom_x_left + bottom_x_right) / 2;
+  car_offset = undistorted.cols / 2 - (bottom_x_left + bottom_x_right) / 2;
 
   float xm_per_pix = 3.7 / 700;
   car_offset = abs(car_offset) * xm_per_pix;

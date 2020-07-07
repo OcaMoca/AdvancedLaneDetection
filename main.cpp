@@ -8,19 +8,19 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
-ofstream test_file("/home/Olivera/LaneDetectionBSc/testing.txt");
+ofstream ground_turth;
 vector<Point2i> test_points;
 char test_text_x[50], test_text_y[50]; 
 
 void CallBackFunc(int event, int x, int y, int flags, void* usrdata)
 {   
+    
     if  ( event == EVENT_LBUTTONDOWN )
     {
         sprintf(test_text_x, "Position ( %d,", x);
         sprintf(test_text_y, "%d )", y);
         strcat(test_text_x, test_text_y);
-        test_file << strcat(test_text_x, "\n");
-        cout << "Position (" << x << ", " << y << ")" << endl;
+        ground_turth << strcat(test_text_x, "\n");
 
         Point2i pt(x,y);
         test_points.push_back(pt);
@@ -35,7 +35,7 @@ int main()
     Mat frame;
     Mat output_frame;
     Mat prev_frame;
-    Mat test_frame;
+    int cnt = 0;
 
     float smoothed_angle = 0.0;
     bool first_frame = true;
@@ -49,8 +49,8 @@ int main()
     ifstream config_file("configuration.json");
     j = nlohmann::json::parse(config_file);
 
-    input_file_s = j.at("input_file").at("name_1");
-    output_file_s = j.at("output_file").at("name_1");
+    input_file_s = j.at("input_file").at("name_3");
+    output_file_s = j.at("output_file").at("name_3");
 
     LoadFrame load_frame(input_file_s, output_file_s);
     CameraCalibration calibrator;
@@ -111,7 +111,6 @@ int main()
     filtered_image_gray = Mat::zeros(frame.rows, frame.cols, CV_32FC2);
     sobel_output = Mat::zeros(frame.rows, frame.cols, CV_32FC2);
     binary_warped = Mat::zeros(frame.rows, frame.cols, CV_32FC2);
-    histogram = Mat::zeros(1, frame.cols, CV_32FC2);
     sliding_window_output = Mat::zeros(1, frame.cols, CV_32FC2);
     optical_flow_output = Mat::zeros(1, frame.cols, CV_32FC2);
     steering_wheel_rotated = steering_wheel;
@@ -121,11 +120,11 @@ int main()
     R_curve_right = 0.0;
     R_curve_avg = 0.0;
 
-    string trap_bottom_width_s = j.at("trap_bottom_width").at("value_1");
-    string trap_top_width_s = j.at("trap_top_width").at("value_1");
-    string trap_height_s = j.at("trap_height").at("value_1");
-    string car_hood_s = j.at("car_hood").at("value_1");
-    string white_range_s = j.at("white_range").at("value_1");
+    string trap_bottom_width_s = j.at("trap_bottom_width").at("value_3");
+    string trap_top_width_s = j.at("trap_top_width").at("value_3");
+    string trap_height_s = j.at("trap_height").at("value_3");
+    string car_hood_s = j.at("car_hood").at("value_3");
+    string white_range_s = j.at("white_range").at("value_3");
 
     frame_processor.trapezoid_roi(frame, trap_bottom_width_s, trap_top_width_s, trap_height_s, car_hood_s);
 
@@ -137,6 +136,7 @@ int main()
         Mat color_warp_output = Mat::zeros(frame.size(), CV_8UC3); 
         vector<float> left_fit_x, right_fit_x;
         vector<Point2f> pts_left, pts_right;
+        histogram = Mat::zeros(1, frame.cols, CV_32FC2);
         
         calibrator.undistort_image(frame, undistorted_frame);
 
@@ -148,6 +148,7 @@ int main()
         bitwise_and(filtered_image_gray, sobel_output, filtered_image_gray);
 
         frame_processor.perspective_transform(filtered_image_gray, binary_warped);
+
 
         /*FEATURE EXTRACTION*/
         
@@ -193,15 +194,6 @@ int main()
             prev_frame = binary_warped;
             first_frame = false;
 
-            /*TESTING*/
-
-            /*test_frame = binary_warped;
-            namedWindow("Test", 1);
-            setMouseCallback("Test", CallBackFunc, NULL);
-            imshow("Test", test_frame);
-            waitKey(0);
-            test_file.close();*/
-
         } else {
             feature_extractor.non_sliding_window(binary_warped, left_fit_lane, right_fit_lane, new_left_fit, new_right_fit, 50);
 
@@ -232,17 +224,12 @@ int main()
 
         hmi.final_perspective(color_warp_output, undistorted_frame, original_roi, warped_roi, output_frame);
 
-        /*cout << "Left lane" << endl;
-        test.compare_parameters(pts_left, test_points);
-        cout << "Right lane" << endl;
-        test.compare_parameters(pts_right, test_points);*/
-
         hmi.show_values(R_curve_avg, car_offset, car_speed, output_frame);
         hmi.show_steering_wheel(output_frame, steering_wheel_rotated, 50);
 
         load_frame.write_to_output_video(output_frame);
 
-        if(car_offset >= 1.3)
+        if(car_offset >= 1.5)
         {
             wait_to_rearrange = 1;
         }
@@ -252,8 +239,63 @@ int main()
         else
             break;
 
+        cnt++;
+
+        cout << cnt << endl;
+
+        if(cnt == 200)
+            break;
+        
+        
+        /*TESTING for 3 specific frames*/
+
+        /*if(cnt != 1 && cnt != 1000 && cnt != 500)
+        {
+            continue;
+        }
+
+        Mat test_frame;
+        Mat M(2,4,CV_32FC2);
+
+        M = getPerspectiveTransform(original_roi, warped_roi);
+        warpPerspective(undistorted_frame, test_frame, M, undistorted_frame.size(), INTER_LINEAR);
+
+        ground_turth.open("/home/Olivera/LaneDetectionBSc/ground_truth1.txt", _S_app);
+        namedWindow("Test", 1);
+        setMouseCallback("Test", CallBackFunc, NULL);
+        imshow("Test", test_frame);
+        waitKey(0);
+        ground_turth.close();
+
+        ofstream error_values;
+        vector<int> error;
+
+        error_values.open("/home/Olivera/LaneDetectionBSc/error_values1.txt", _S_app); 
+        std::ostream_iterator<int> error_values_it(error_values," ");
+
+        test.compare_parameters(pts_left, test_points, "left");
+        error = test.getError();
+        copy(error.begin(), error.end(), error_values_it);
+
+        test.clear_error_vector();
+        error.clear();
+
+        test.compare_parameters(pts_right, test_points, "right");
+        error = test.getError();
+        copy(error.begin(), error.end(), error_values_it);
+
+        test.clear_error_vector();
+        error.clear();
+        test_points.clear();
+
+        error_values << "\n";
+        error_values.close();*/
+    
     }
 
     load_frame.close_output_video();
+   
+
+    
 
 }
