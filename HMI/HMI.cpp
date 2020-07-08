@@ -2,12 +2,11 @@
 
 HMI::HMI(){}
 
-void HMI::get_inverse_points(const vector<float>& plot_y, const vector<float>& left_fit_x, const vector<float>& right_fit_x, Mat& color_warp_output, vector<Point2f>& pts_left, vector<Point2f>& pts_right)
+void HMI::get_inverse_points(const vector<float>& plot_y, const vector<float>& left_fit_x, const vector<float>& right_fit_x, Mat& color_warp_output, vector<Point2f>& pts_left, vector<Point2f>& pts_right, vector<Point>& pts)
 {
 
-  vector<Point> pts;
-
-  for (int i = 0; i < (int)plot_y.size(); i++) {
+  for (int i = 0; i < (int)plot_y.size(); i++)
+  {
     pts_left.push_back(Point2f((float)left_fit_x[i], (float)plot_y[i])); 
     pts_right.push_back(Point2f((float)right_fit_x[i], (float)plot_y[i]));
   }

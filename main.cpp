@@ -8,26 +8,6 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
-ofstream ground_turth;
-vector<Point2i> test_points;
-char test_text_x[50], test_text_y[50]; 
-
-void CallBackFunc(int event, int x, int y, int flags, void* usrdata)
-{   
-    
-    if  ( event == EVENT_LBUTTONDOWN )
-    {
-        sprintf(test_text_x, "Position ( %d,", x);
-        sprintf(test_text_y, "%d )", y);
-        strcat(test_text_x, test_text_y);
-        ground_turth << strcat(test_text_x, "\n");
-
-        Point2i pt(x,y);
-        test_points.push_back(pt);
-    }
-    
-}
-
 int main()
 {
     json j; 
@@ -245,51 +225,6 @@ int main()
 
         if(cnt == 200)
             break;
-        
-        
-        /*TESTING for 3 specific frames*/
-
-        /*if(cnt != 1 && cnt != 1000 && cnt != 500)
-        {
-            continue;
-        }
-
-        Mat test_frame;
-        Mat M(2,4,CV_32FC2);
-
-        M = getPerspectiveTransform(original_roi, warped_roi);
-        warpPerspective(undistorted_frame, test_frame, M, undistorted_frame.size(), INTER_LINEAR);
-
-        ground_turth.open("/home/Olivera/LaneDetectionBSc/ground_truth1.txt", _S_app);
-        namedWindow("Test", 1);
-        setMouseCallback("Test", CallBackFunc, NULL);
-        imshow("Test", test_frame);
-        waitKey(0);
-        ground_turth.close();
-
-        ofstream error_values;
-        vector<int> error;
-
-        error_values.open("/home/Olivera/LaneDetectionBSc/error_values1.txt", _S_app); 
-        std::ostream_iterator<int> error_values_it(error_values," ");
-
-        test.compare_parameters(pts_left, test_points, "left");
-        error = test.getError();
-        copy(error.begin(), error.end(), error_values_it);
-
-        test.clear_error_vector();
-        error.clear();
-
-        test.compare_parameters(pts_right, test_points, "right");
-        error = test.getError();
-        copy(error.begin(), error.end(), error_values_it);
-
-        test.clear_error_vector();
-        error.clear();
-        test_points.clear();
-
-        error_values << "\n";
-        error_values.close();*/
     
     }
 
