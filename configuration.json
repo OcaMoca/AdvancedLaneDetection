@@ -20,21 +20,21 @@
     },
 
     "trap_bottom_width" : {
-        "value_1" : "0.7",
+        "value_1" : "0.7f",
         "value_2" : "0.28f",
-        "value_3" : "0.2f"
+        "value_3" : "0.27f"
     },
 
     "trap_top_width" : {
         "value_1" : "0.1f",
         "value_2" : "0.05f",
-        "value_3" : "0.058f"
+        "value_3" : "0.062f"
     },
 
     "trap_height" : {
         "value_1" : "0.38f",
         "value_2" : "0.3f",
-        "value_3" : "0.32f"
+        "value_3" : "0.31f"
     },
 
     "car_hood" : {

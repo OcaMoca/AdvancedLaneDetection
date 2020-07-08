@@ -22,7 +22,6 @@ void TestModule::compare_parameters(vector<Point2f>& processed_points, vector<Po
             {
 
                 error.push_back(abs((*it1).x - (int)((*it2).x))); // store absolute value of differece between x coordinates of processed and ground truth point
-                cout << abs((*it1).x - (int)((*it2).x)) << endl;
             } 
             
             it1++;
@@ -36,13 +35,49 @@ void TestModule::compare_parameters(vector<Point2f>& processed_points, vector<Po
     return;
 }
 
-vector<int> TestModule::getError()
+void TestModule::calculate_params_error(vector<Point2i>& test_points, vector<Point2f>& pts_left, vector<Point2f>& pts_right)
 {
-    return error;
+    ofstream error_values;
+    error_values.open("/home/Olivera/LaneDetectionBSc/error_values1.txt", _S_app); 
+    std::ostream_iterator<int> error_values_it(error_values," ");
+
+    /* Left line */
+    compare_parameters(pts_left, test_points, "left");
+    copy(error.begin(), error.end(), error_values_it);
+    error.clear();
+
+    /* Right line */
+    compare_parameters(pts_right, test_points, "right");
+    copy(error.begin(), error.end(), error_values_it);
+    error.clear();
+
+    test_points.clear();
+    error_values << "\n";
+    error_values.close();
 }
 
-void TestModule::clear_error_vector()
+void get_frame_params(int& frame_num, vector<Point2f>& pts_left, vector<Point2f>& pts_right, vector<Point2f>& all_pts)
 {
-    error.clear();
+
+
 }
+
+void TestModule::calculate_specific_point_error(vector<Point2i>& test_points, vector<Point2f>& pts_left, vector<Point2f>& pts_right)
+{
+
+    vector<Point2i>::reverse_iterator it1;
+    vector<Point2f>::iterator it2;
+
+    /*sort(ground_truth_points.rbegin(), ground_truth_points.rend(), comp);
+
+    for(it1 = ground_truth_points.rbegin(), it2 = processed_points.begin(); it1 != ground_truth_points.rend(), it2 != processed_points.end(); it2++)
+    {
+
+    }*/
+
+
+}
+
+
+        
 
