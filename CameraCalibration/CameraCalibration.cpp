@@ -14,7 +14,7 @@ bool CameraCalibration::add_chessboard_points(vector<string>& camera_images, Siz
     Mat image;
     Mat gray;
 
-    for(int i = 0; i < camera_images.size(); i++)
+    for(int i = 0; i <(int)camera_images.size(); i++)
     {
         image = imread(camera_images[i]);
         cvtColor(image, gray, COLOR_BGR2GRAY);
@@ -26,7 +26,7 @@ bool CameraCalibration::add_chessboard_points(vector<string>& camera_images, Siz
             cornerSubPix(gray, image_corners, Size(5,5), Size(-1,-1), TermCriteria(TermCriteria::MAX_ITER + TermCriteria::EPS, 30, 0.1));
         }
 
-        if (image_corners.size() == board_size.area())
+        if ((int)image_corners.size() == board_size.area())
         {
             image_points.push_back(image_corners);
             object_points.push_back(object_corners);

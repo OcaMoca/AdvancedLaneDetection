@@ -321,7 +321,7 @@ void FeatureExtraction::convert_to_optical(const Mat& curr_frame, Mat& prev_fram
 
   calcOpticalFlowPyrLK(prev_frame_gray, curr_frame_gray, old_point_vector, new_point_vector, status, error, Size(15, 15), 2, criteria);
 
-  for(int i = 0; i < old_point_vector.size(); i++)
+  for(int i = 0; i < (int)old_point_vector.size(); i++)
   {
     if(status[i] == 1)
     {

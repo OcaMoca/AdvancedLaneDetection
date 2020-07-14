@@ -29,7 +29,7 @@ class LoadFrame
     public:
 
         LoadFrame(string&, String&);
-        void open_input_video();
+        void open_video_files();
         bool read_frame();
         void get_frame(Mat&);
         void write_to_output_video(Mat&);

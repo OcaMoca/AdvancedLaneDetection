@@ -65,7 +65,7 @@ int main()
 
     /*LOADING FIRST FRAME*/
 
-    load_frame.open_input_video();
+    load_frame.open_video_files();
     load_frame.read_frame();
     load_frame.get_frame(frame);
 
@@ -83,6 +83,19 @@ int main()
     
     success = calibrator.add_chessboard_points(chessboard_images, board_size);
     error = calibrator.calibration(image_size);
+
+    if(success)
+    {
+        cout << "Adding chessboard points failed." << endl;
+        return 1;
+    }
+
+    if(error)
+    {
+        cout << "Calibration failed." << endl;
+        return 1;
+
+    }
 
     /*FRAME PROCESSING*/
     
