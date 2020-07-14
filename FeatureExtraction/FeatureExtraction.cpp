@@ -289,7 +289,7 @@ void FeatureExtraction::convert_to_optical(const Mat& curr_frame, Mat& prev_fram
   float y2_meter;
 
   vector<float> distance;
-  float time = 1 / 60.0;
+  float time = 1 / 25.0;
   vector<float> speed;
 
   float speed_avg;

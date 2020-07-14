@@ -6,7 +6,7 @@ LoadFrame::LoadFrame(string& input_file_s, string& output_file_s)
     output_file = output_file_s;
 }
 
-void LoadFrame::open_input_video()
+void LoadFrame::open_video_files()
 {
     capture.open(input_file);
 

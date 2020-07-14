@@ -3,7 +3,6 @@
 #include "FrameProcessing/FrameProcessing.hpp"
 #include "FeatureExtraction/FeatureExtraction.hpp"
 #include "HMI/HMI.hpp"
-#include "TestModule/TestModule.hpp"
 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
@@ -20,8 +19,8 @@ int main()
     float smoothed_angle = 0.0;
     bool first_frame = true;
     Mat steering_wheel;
-    Mat left_fit_lane, right_fit_lane;
     int wait_to_rearrange = 0;
+    Mat left_fit_lane, right_fit_lane;
     
     string input_file_s;
     string output_file_s;
@@ -29,15 +28,14 @@ int main()
     ifstream config_file("configuration.json");
     j = nlohmann::json::parse(config_file);
 
-    input_file_s = j.at("input_file").at("name_3");
-    output_file_s = j.at("output_file").at("name_3");
+    input_file_s = j.at("input_file").at("name_1");
+    output_file_s = j.at("output_file").at("name_1");
 
     LoadFrame load_frame(input_file_s, output_file_s);
     CameraCalibration calibrator;
     FrameProcessing frame_processor;
     FeatureExtraction feature_extractor;
     HMI hmi;
-    TestModule test;
 
     string steering_wheel_image = j.at("steering_wheel").at("name");
     steering_wheel = imread(steering_wheel_image, IMREAD_UNCHANGED);
@@ -46,7 +44,7 @@ int main()
 
     /*LOADING FIRST FRAME*/
 
-    load_frame.open_input_video();
+    load_frame.open_video_files();
     load_frame.read_frame();
     load_frame.get_frame(frame);
 
@@ -58,12 +56,20 @@ int main()
 
     bool success;
     int error;
-    cv::Size board_size(8,6);
+    cv::Size board_size(9,6);
     Mat img = imread(chessboard_images[0]);
     cv::Size image_size(1280,720);
     
     success = calibrator.add_chessboard_points(chessboard_images, board_size);
     error = calibrator.calibration(image_size);
+
+    cout << "(Calibration) Root mean square re-projection error is: " << error << endl;
+
+    if(!success)
+    {
+        cout << "Adding chessboard corners failed." << endl;
+    }
+
 
     /*FRAME PROCESSING*/
     
@@ -79,7 +85,7 @@ int main()
     Mat sliding_window_output;
     vector<Window> left_boxes, right_boxes;
     Mat optical_flow_output;
-    Mat new_left_fit, new_right_fit;
+    
     float R_curve_left, R_curve_right, R_curve_avg;
     int car_speed;
     float car_offset;
@@ -100,11 +106,11 @@ int main()
     R_curve_right = 0.0;
     R_curve_avg = 0.0;
 
-    string trap_bottom_width_s = j.at("trap_bottom_width").at("value_3");
-    string trap_top_width_s = j.at("trap_top_width").at("value_3");
-    string trap_height_s = j.at("trap_height").at("value_3");
-    string car_hood_s = j.at("car_hood").at("value_3");
-    string white_range_s = j.at("white_range").at("value_3");
+    string trap_bottom_width_s = j.at("trap_bottom_width").at("value_1");
+    string trap_top_width_s = j.at("trap_top_width").at("value_1");
+    string trap_height_s = j.at("trap_height").at("value_1");
+    string car_hood_s = j.at("car_hood").at("value_1");
+    string white_range_s = j.at("white_range").at("value_1");
 
     frame_processor.trapezoid_roi(frame, trap_bottom_width_s, trap_top_width_s, trap_height_s, car_hood_s);
 
@@ -116,6 +122,7 @@ int main()
         Mat color_warp_output = Mat::zeros(frame.size(), CV_8UC3); 
         vector<float> left_fit_x, right_fit_x;
         vector<Point2f> pts_left, pts_right;
+        Mat new_left_fit, new_right_fit;
         histogram = Mat::zeros(1, frame.cols, CV_32FC2);
         
         calibrator.undistort_image(frame, undistorted_frame);
@@ -129,7 +136,6 @@ int main()
 
         frame_processor.perspective_transform(filtered_image_gray, binary_warped);
 
-
         /*FEATURE EXTRACTION*/
         
         plot_y = feature_extractor.linspace(0.0, (float)binary_warped.rows - 1, (float)binary_warped.rows);
@@ -140,13 +146,14 @@ int main()
 
         if(wait_to_rearrange == 1)
         {
-            if(left_peak.x > (binary_warped.cols / 2) - 100 || left_peak.x < 300 || right_peak.x < (binary_warped.cols / 2) + 100 || right_peak.x > binary_warped.cols - 300)
+            if(left_peak.x > (binary_warped.cols / 2) - 300 || left_peak.x < 300 || right_peak.x < (binary_warped.cols / 2) + 300 || right_peak.x > binary_warped.cols - 300)
             {
                 load_frame.write_to_output_video(undistorted_frame);
                 if(load_frame.read_frame())
                 {   
                     load_frame.get_frame(frame);
                     continue;
+                    
                 } 
     
             } else {
@@ -175,6 +182,7 @@ int main()
             first_frame = false;
 
         } else {
+            
             feature_extractor.non_sliding_window(binary_warped, left_fit_lane, right_fit_lane, new_left_fit, new_right_fit, 50);
 
             feature_extractor.poly_fit_x(plot_y, left_fit_x, new_left_fit);
@@ -200,7 +208,7 @@ int main()
 
         /*HMI*/
 
-        hmi.get_inverse_points(plot_y, left_fit_x, right_fit_x, color_warp_output, pts_left, pts_right);
+        hmi.get_inverse_points(plot_y, left_fit_x, right_fit_x, color_warp_output);
 
         hmi.final_perspective(color_warp_output, undistorted_frame, original_roi, warped_roi, output_frame);
 
@@ -209,7 +217,7 @@ int main()
 
         load_frame.write_to_output_video(output_frame);
 
-        if(car_offset >= 1.5)
+        if(car_offset >= 1.6)
         {
             wait_to_rearrange = 1;
         }
@@ -222,15 +230,8 @@ int main()
         cnt++;
 
         cout << cnt << endl;
-
-        if(cnt == 200)
-            break;
-    
     }
 
     load_frame.close_output_video();
-   
-
-    
 
 }

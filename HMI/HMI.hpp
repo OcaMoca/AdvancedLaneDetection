@@ -16,7 +16,7 @@ class HMI
     public:
         HMI();
         
-        void get_inverse_points(const vector<float>&, const vector<float>&, const vector<float>&, Mat&, vector<Point2f>&, vector<Point2f>&, vector<Point>&);
+        void get_inverse_points(const vector<float>&, const vector<float>&, const vector<float>&, Mat&);
         void final_perspective(const Mat&, const Mat&, vector<Point2f>&, vector<Point2f>&, Mat&);
 
         void show_values(float, float, int, Mat&);

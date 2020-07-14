@@ -8,7 +8,7 @@ bool CameraCalibration::add_chessboard_points(vector<string>& camera_images, Siz
     bool success;
 
     for(int i = 0; i < board_size.height; i++)
-        for(int j = 0; j < board_size.width; j++)
+        for(int j = 0; j < (int)board_size.width; j++)
             object_corners.push_back(Point3f(i, j, 0.0f));
 
     Mat image;
@@ -19,7 +19,7 @@ bool CameraCalibration::add_chessboard_points(vector<string>& camera_images, Siz
         image = imread(camera_images[i]);
         cvtColor(image, gray, COLOR_BGR2GRAY);
 
-        found = findChessboardCorners(gray, board_size, image_corners, CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_FILTER_QUADS);
+        found = findChessboardCorners(gray, board_size, image_corners, CALIB_CB_ADAPTIVE_THRESH + CALIB_CB_NORMALIZE_IMAGE + CALIB_CB_FAST_CHECK);
 
         if (found)
         {
